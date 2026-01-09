@@ -1,0 +1,59 @@
+# Python Dependencies for PQC Cryptography Benchmarking Suite
+# 
+# Usage:
+#   python3 -m venv pqc_lab
+#   source pqc_lab/bin/activate
+#   pip install -r requirements.txt
+#
+# Pinned versions ensure reproducible benchmarks across environments.
+
+# ============================================================================
+# CORE CRYPTOGRAPHIC LIBRARIES
+# ============================================================================
+
+# Post-Quantum Cryptography: liboqs Python bindings
+# Provides Kyber512 and BIKE-L1 implementations
+oqs==0.14.1
+
+# Classical ECDH: PyNaCl (libsodium bindings)
+# Provides X25519 elliptic curve cryptography
+PyNaCl==1.6.2
+
+# Symmetric AEAD Cipher: Ascon (lightweight, quantum-resistant)
+# Used as the Data Encapsulation Mechanism (DEM) for all models
+ascon==0.2.0
+
+# ============================================================================
+# DATA PROCESSING & ANALYSIS
+# ============================================================================
+
+# Numerical computing
+numpy==1.24.0
+
+# Scientific computing (statistics, optimization)
+scipy==1.11.0
+
+# Data manipulation and CSV handling
+pandas==2.0.0
+
+# Plotting and visualization
+matplotlib==3.7.0
+
+# ============================================================================
+# PERFORMANCE PROFILING (Optional but Recommended)
+# ============================================================================
+
+# Memory profiling: @profile decorator and mprof tool
+memory-profiler==0.61.0
+
+# System utilities: CPU/memory monitoring
+psutil==7.2.1
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# Tested on:
+# - Ubuntu 22.04 LTS, Python 3.10+
+# - WSL2 (Windows 11), Python 3.10+
+# - macOS 12+, Python 3.10+ (Intel and Apple Silicon)
