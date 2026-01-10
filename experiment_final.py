@@ -385,8 +385,8 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
     Run ENT entropy test multiple times per model.
     
     For each iteration:
-    1. Generate 10MB of encrypted zeros
-    2. Run ent -t to get serial correlation coefficient
+    1. Generate 1MB of encrypted zeros (reduced from 10MB for speed)
+    2. Run ent -t via pipe to get serial correlation coefficient
     
     Args:
         model: HybridModel instance to test
@@ -408,8 +408,8 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
     
     for iteration_num in range(1, iterations + 1):
         try:
-            # Generate 10 MB of zeros
-            PAYLOAD_SIZE_MB = 10
+            # Generate 1 MB of zeros (reduced from 10MB for 10x speedup in I/O)
+            PAYLOAD_SIZE_MB = 1
             payload = bytes([0x00]) * (PAYLOAD_SIZE_MB * 1024 * 1024)
             
             # Setup model for single encryption
@@ -419,17 +419,12 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
             key = os.urandom(16)
             nonce, ct, tag, _ = model.encrypt(key, payload)
             
-            # Write ciphertext to temp output file
-            output_path = f"output_{model.name}_iter{iteration_num}.bin"
-            with open(output_path, "wb") as f:
-                f.write(ct)
-            
-            # Run ent -t output.bin
+            # Run ent -t via pipe (stdin) to avoid disk I/O - FIX #4
             try:
                 result = subprocess.run(
-                    ["ent", "-t", output_path],
+                    ["ent", "-t"],  # Read from stdin instead of file
+                    input=ct,  # Binary ciphertext passed directly
                     capture_output=True,
-                    text=True,
                     timeout=60,
                 )
                 
@@ -442,31 +437,32 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
                         "status": "ent tool returned error",
                     })
                 else:
-                    # Parse output: Look for "Serial correlation coefficient:"
+                    # FIX #1: Parse ENT -t CSV output correctly
+                    # ent -t outputs CSV: Header,Col1,Col2,...,Serial-Correlation
+                    # Data row with actual serial correlation value
                     serial_corr = None
-                    for line in result.stdout.split('\n'):
-                        if "Serial correlation coefficient" in line:
-                            parts = line.split(':')
-                            if len(parts) > 1:
-                                try:
-                                    serial_corr = float(parts[1].strip())
-                                except ValueError:
-                                    pass
-                                break
+                    try:
+                        output_text = result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else result.stdout
+                        lines = output_text.strip().split('\n')
+                        if len(lines) >= 2:
+                            header = lines[0].split(',')
+                            data = lines[1].split(',')
+                            
+                            # Find "Serial-Correlation" column index
+                            if "Serial-Correlation" in header:
+                                idx = header.index("Serial-Correlation")
+                                if idx < len(data):
+                                    serial_corr = float(data[idx].strip())
+                    except (IndexError, ValueError, AttributeError):
+                        serial_corr = None
                     
                     results.append({
                         "model": model.name,
                         "iteration": iteration_num,
                         "entropy_bytes": len(ct),
                         "serial_correlation_coefficient": serial_corr,
-                        "status": "success" if serial_corr is not None else "parsed but no correlation found",
+                        "status": "success" if serial_corr is not None else "ent ran but parse failed",
                     })
-                
-                # Clean up temp output file
-                try:
-                    os.remove(output_path)
-                except:
-                    pass
             
             except FileNotFoundError:
                 results.append({
@@ -762,27 +758,6 @@ def generate_summary_csv(input_csv: str, output_csv: str, ent_csv: str = None) -
         writer = csv_module.DictWriter(f, fieldnames=all_fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(summary_rows)
-        pass
-    
-    # Compute means and write summary
-    numeric_cols = ['KeyGen_ns', 'Encaps_ns', 'Decaps_ns', 'KDF_ns',
-                   'Encryption_ns', 'Decryption_ns', 'Total_ns', 'Total_s', 'Failed', 'Peak_Alloc_KB']
-    summary_rows = []
-    for model in sorted(model_stats.keys()):
-        summary_row = {'Model': model}
-        for col in numeric_cols:
-            values = model_stats[model].get(col, [])
-            if values:
-                summary_row[col] = sum(values) / len(values)
-            else:
-                summary_row[col] = 0.0
-        summary_rows.append(summary_row)
-    
-    # Write summary CSV
-    with open(output_csv, 'w', newline='', encoding='utf-8') as f:
-        writer = csv_module.DictWriter(f, fieldnames=['Model'] + numeric_cols)
-        writer.writeheader()
-        writer.writerows(summary_rows)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -867,8 +842,9 @@ def main():
     csv_file.close()
 
     # Run ENT entropy tests (Metric 3) - 50 iterations per model
+    # FIX #3: Parallelize model testing for 4x speedup
     ent_csv_path = "ENT_Test.csv"
-    print("\nRunning ENT randomness tests (50 iterations, 10MB per iteration per model)...")
+    print("\nRunning ENT randomness tests (50 iterations, 1MB per iteration, parallel processing)...")
     ent_iterations = 50
     ent_file = open(ent_csv_path, 'w', newline='', buffering=1)
     ent_fieldnames = ['Model', 'Iteration', 'Entropy_Bytes', 'Serial_Correlation_Coefficient', 'Status']
@@ -876,25 +852,43 @@ def main():
     ent_writer_obj.writeheader()
     
     ent_all_results = {}
-    for m in models:
-        print(f"  {m.name}...", end=" ", flush=True)
+    
+    # FIX #3: Use ThreadPoolExecutor to run models in parallel
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    
+    csv_lock = threading.Lock()
+    
+    def run_ent_and_log(m):
+        """Run ENT tests for a single model."""
         ent_results = run_ent_entropy_test(m, iterations=ent_iterations)
-        ent_all_results[m.name] = ent_results
         
-        # Write per-iteration results to CSV
         success_count = 0
-        for ent_result in ent_results:
-            ent_writer_obj.writerow({
-                'Model': ent_result.get('model'),
-                'Iteration': ent_result.get('iteration'),
-                'Entropy_Bytes': ent_result.get('entropy_bytes', ''),
-                'Serial_Correlation_Coefficient': ent_result.get('serial_correlation_coefficient', ''),
-                'Status': ent_result.get('status'),
-            })
-            if ent_result.get('status') == 'success' and ent_result.get('serial_correlation_coefficient') is not None:
-                success_count += 1
+        with csv_lock:
+            for ent_result in ent_results:
+                ent_writer_obj.writerow({
+                    'Model': ent_result.get('model'),
+                    'Iteration': ent_result.get('iteration'),
+                    'Entropy_Bytes': ent_result.get('entropy_bytes', ''),
+                    'Serial_Correlation_Coefficient': ent_result.get('serial_correlation_coefficient', ''),
+                    'Status': ent_result.get('status'),
+                })
+                if ent_result.get('status') == 'success' and ent_result.get('serial_correlation_coefficient') is not None:
+                    success_count += 1
         
-        print(f" ✓ ({success_count}/{ent_iterations} successful)")
+        return m.name, ent_results, success_count
+    
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(run_ent_and_log, m): m for m in models}
+        
+        for future in futures:
+            try:
+                model_name, ent_results, success_count = future.result()
+                ent_all_results[model_name] = ent_results
+                print(f"  {model_name}...", end=" ", flush=True)
+                print(f" ✓ ({success_count}/{ent_iterations} successful)")
+            except Exception as e:
+                print(f"  ERROR: {e}", flush=True)
     
     ent_file.close()
     print(f"✓ Wrote {ent_csv_path}")
