@@ -380,17 +380,18 @@ def compute_bandwidth_summary() -> Dict[str, Any]:
 # ENT Entropy Test (Metric 3)
 # ----------------------------
 
-def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[str, Any]]:
+def run_ent_entropy_test(model: HybridModel, iterations: int = 50, payload_mb: int = 1) -> List[Dict[str, Any]]:
     """
     Run ENT entropy test multiple times per model.
     
     For each iteration:
-    1. Generate 1MB of encrypted zeros (reduced from 10MB for speed)
+    1. Generate payload of configurable size in MB (default 1MB for speed)
     2. Run ent -t via pipe to get serial correlation coefficient
     
     Args:
         model: HybridModel instance to test
         iterations: Number of iterations to run (default 50)
+        payload_mb: Size of payload in MB (default 1)
     
     Returns:
         List of dicts, one per iteration:
@@ -398,6 +399,7 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
             "model": str,
             "iteration": int,
             "entropy_bytes": int,
+            "entropy_bits_per_byte": float (bits of entropy per byte),
             "serial_correlation_coefficient": float (or None if ent not available),
             "status": str,
         }
@@ -408,9 +410,8 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
     
     for iteration_num in range(1, iterations + 1):
         try:
-            # Generate 1 MB of zeros (reduced from 10MB for 10x speedup in I/O)
-            PAYLOAD_SIZE_MB = 1
-            payload = bytes([0x00]) * (PAYLOAD_SIZE_MB * 1024 * 1024)
+            # Generate payload of configurable size in MB (default 1MB for speedup in I/O)
+            payload = bytes([0x00]) * (payload_mb * 1024 * 1024)
             
             # Setup model for single encryption
             model.setup()
@@ -438,9 +439,11 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
                     })
                 else:
                     # FIX #1: Parse ENT -t CSV output correctly
-                    # ent -t outputs CSV: Header,Col1,Col2,...,Serial-Correlation
-                    # Data row with actual serial correlation value
+                    # ent -t outputs CSV: Entropy,Chi-Square,Compression,Serial-Correlation,...
+                    # Data row with actual values for each metric
+                    entropy_bits_per_byte = None
                     serial_corr = None
+                    
                     try:
                         output_text = result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else result.stdout
                         lines = output_text.strip().split('\n')
@@ -448,26 +451,39 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
                             header = lines[0].split(',')
                             data = lines[1].split(',')
                             
-                            # Find "Serial-Correlation" column index
+                            # Extract Entropy (bits per byte) - column 0
+                            if "Entropy" in header:
+                                idx = header.index("Entropy")
+                                if idx < len(data):
+                                    entropy_bits_per_byte = float(data[idx].strip())
+                            
+                            # Extract Serial-Correlation - typically last column
                             if "Serial-Correlation" in header:
                                 idx = header.index("Serial-Correlation")
                                 if idx < len(data):
                                     serial_corr = float(data[idx].strip())
-                    except (IndexError, ValueError, AttributeError):
+                    except (IndexError, ValueError, AttributeError) as e:
+                        entropy_bits_per_byte = None
                         serial_corr = None
+                    
+                    # Determine status: success only if BOTH metrics are measured
+                    status = "success" if (entropy_bits_per_byte is not None and serial_corr is not None) else "ent ran but parse failed"
                     
                     results.append({
                         "model": model.name,
                         "iteration": iteration_num,
                         "entropy_bytes": len(ct),
+                        "entropy_bits_per_byte": entropy_bits_per_byte,
                         "serial_correlation_coefficient": serial_corr,
-                        "status": "success" if serial_corr is not None else "ent ran but parse failed",
+                        "status": status,
                     })
             
             except FileNotFoundError:
                 results.append({
                     "model": model.name,
                     "iteration": iteration_num,
+                    "entropy_bytes": len(ct) if 'ct' in locals() else 0,
+                    "entropy_bits_per_byte": None,
                     "serial_correlation_coefficient": None,
                     "status": "ent tool not found",
                 })
@@ -475,6 +491,8 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
                 results.append({
                     "model": model.name,
                     "iteration": iteration_num,
+                    "entropy_bytes": len(ct) if 'ct' in locals() else 0,
+                    "entropy_bits_per_byte": None,
                     "serial_correlation_coefficient": None,
                     "status": "ent tool timeout",
                 })
@@ -483,6 +501,8 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50) -> List[Dict[
             results.append({
                 "model": model.name,
                 "iteration": iteration_num,
+                "entropy_bytes": 0,
+                "entropy_bits_per_byte": None,
                 "serial_correlation_coefficient": None,
                 "status": "ent test failed",
             })
@@ -541,6 +561,9 @@ def bench_model_enhanced(
         }
         return row
     
+    # Start tracemalloc for memory profiling (FIX: start once at beginning)
+    tracemalloc.start()
+    
     # Measure model setup (KeyGen) once per model
     keygen_t0 = time.process_time_ns()
     model.setup()
@@ -560,9 +583,9 @@ def bench_model_enhanced(
             timing.encaps_ns = encaps_ns
             timing.decaps_ns = decaps_ns
             
-            # Capture peak allocated ONLY during KEM phase
+            # Capture peak allocated ONLY during KEM phase (FIX: get_traced_memory returns (current, peak))
             try:
-                _, peak_bytes = tracemalloc.get_traced_memory()
+                current, peak_bytes = tracemalloc.get_traced_memory()
                 timing.peak_alloc_kb = peak_bytes / 1024.0
             except:
                 pass
@@ -675,7 +698,7 @@ def generate_summary_csv(input_csv: str, output_csv: str, ent_csv: str = None) -
         'Encryption_ns', 'Decryption_ns', 'Total_ns', 'Peak_Alloc_KB'
     ]
     
-    ent_cols = ['Serial_Correlation_Coefficient']
+    ent_cols = ['Entropy_Bits_Per_Byte', 'Serial_Correlation_Coefficient']
     
     summary_rows = []
     for model in ['ModelA_Kyber512', 'ModelB_BIKE_L1', 'ModelC_X25519', 'ModelD_PSK_Ascon80pq']:
@@ -767,6 +790,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--out", type=str, default="results.json")
     ap.add_argument("--csv-out", type=str, default="testing_process.csv")
+    ap.add_argument("--ent-payload-mb", type=int, default=1, help="ENT test payload size in MB (default: 1)")
     args = ap.parse_args()
 
     random.seed(args.seed)
@@ -844,10 +868,10 @@ def main():
     # Run ENT entropy tests (Metric 3) - 50 iterations per model
     # FIX #3: Parallelize model testing for 4x speedup
     ent_csv_path = "ENT_Test.csv"
-    print("\nRunning ENT randomness tests (50 iterations, 1MB per iteration, parallel processing)...")
+    print("\nRunning ENT randomness tests (50 iterations, parallel processing)...")
     ent_iterations = 50
     ent_file = open(ent_csv_path, 'w', newline='', buffering=1)
-    ent_fieldnames = ['Model', 'Iteration', 'Entropy_Bytes', 'Serial_Correlation_Coefficient', 'Status']
+    ent_fieldnames = ['Model', 'Iteration', 'Entropy_Bytes', 'Entropy_Bits_Per_Byte', 'Serial_Correlation_Coefficient', 'Status']
     ent_writer_obj = csv.DictWriter(ent_file, fieldnames=ent_fieldnames, extrasaction='ignore')
     ent_writer_obj.writeheader()
     
@@ -861,7 +885,7 @@ def main():
     
     def run_ent_and_log(m):
         """Run ENT tests for a single model."""
-        ent_results = run_ent_entropy_test(m, iterations=ent_iterations)
+        ent_results = run_ent_entropy_test(m, iterations=ent_iterations, payload_mb=args.ent_payload_mb)
         
         success_count = 0
         with csv_lock:
@@ -870,10 +894,14 @@ def main():
                     'Model': ent_result.get('model'),
                     'Iteration': ent_result.get('iteration'),
                     'Entropy_Bytes': ent_result.get('entropy_bytes', ''),
+                    'Entropy_Bits_Per_Byte': ent_result.get('entropy_bits_per_byte', ''),
                     'Serial_Correlation_Coefficient': ent_result.get('serial_correlation_coefficient', ''),
                     'Status': ent_result.get('status'),
                 })
-                if ent_result.get('status') == 'success' and ent_result.get('serial_correlation_coefficient') is not None:
+                # Count success only if BOTH entropy AND serial correlation are measured
+                if (ent_result.get('status') == 'success' and 
+                    ent_result.get('entropy_bits_per_byte') is not None and
+                    ent_result.get('serial_correlation_coefficient') is not None):
                     success_count += 1
         
         return m.name, ent_results, success_count
