@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
-"""
-main_experiment_enhanced.py
-
-Enhanced version with:
-1. CSV logging (latency_results.csv) with nanosecond precision
-2. Per-iteration tracking (not aggregated)
-3. Backward compatibility with JSON output
-4. Memory profiling hooks
-5. ENT entropy collection readiness
-"""
 
 from __future__ import annotations
-
 import abc
 import argparse
 import csv
@@ -664,33 +653,73 @@ def generate_summary_csv(input_csv: str, output_csv: str, ent_csv: str = None) -
     """
     Read testing_process.csv and ENT_Test.csv, generate testing_summary.csv with aggregate stats.
     
+    DEFENSIVE FIELD LIMIT HANDLING:
+    
+    Root Cause of _csv.Error: field larger than field limit (131072):
+    - Python's csv module has default field_size_limit of 128 KB (131072 bytes)
+    - Triggered when: large JSON blobs, unescaped newlines, very wide rows, or
+      continuous strings without delimiters exceed this limit
+    - In this benchmark: unlikely unless payload_bytes >> 100KB written as single field
+    
+    Fix Strategy (3 layers of defense):
+    1. Raise field_size_limit to 1 GiB BEFORE reading any CSV
+    2. Wrap CSV reads in try-except; skip corrupted files with warning
+    3. Graceful degradation: continue without missing files instead of crash
+    
     Args:
-        input_csv: Path to testing_process.csv
+        input_csv: Path to testing_process.csv (required)
         output_csv: Path to testing_summary.csv (output)
         ent_csv: Path to ENT_Test.csv (optional)
     """
     import csv as csv_module
+    import sys
     
-    # Read input CSV (latency metrics)
+    # === LAYER 1: Set CSV field size limit ONCE before any read ===
+    try:
+        # Raise to min(sys.maxsize, 1 GiB) to handle very large fields
+        new_limit = min(sys.maxsize, 1024 * 1024 * 1024) if hasattr(sys, 'maxsize') else 1024 * 1024 * 1024
+        csv.field_size_limit(new_limit)
+    except (OverflowError, AttributeError):
+        # Fallback to 512 MiB if 1 GiB fails
+        try:
+            csv.field_size_limit(512 * 1024 * 1024)
+        except (OverflowError, AttributeError):
+            pass  # Use default; hope CSV fields don't exceed 128 KB
+    
+    # === LAYER 2: Read input CSV with try-except error recovery ===
     data_by_model = {}
-    with open(input_csv, 'r', encoding='utf-8') as f:
-        reader = csv_module.DictReader(f)
-        for row in reader:
-            model = row['Model']
-            if model not in data_by_model:
-                data_by_model[model] = []
-            data_by_model[model].append(row)
-    
-    # Read ENT CSV if available (entropy metrics)
-    ent_data_by_model = {}
-    if ent_csv and os.path.exists(ent_csv):
-        with open(ent_csv, 'r', encoding='utf-8') as f:
+    try:
+        with open(input_csv, 'r', encoding='utf-8') as f:
             reader = csv_module.DictReader(f)
             for row in reader:
                 model = row['Model']
-                if model not in ent_data_by_model:
-                    ent_data_by_model[model] = []
-                ent_data_by_model[model].append(row)
+                if model not in data_by_model:
+                    data_by_model[model] = []
+                data_by_model[model].append(row)
+    except csv_module.Error as e:
+        print(f"WARNING: CSV read error in {input_csv}: {e}. Continuing with partial data.", file=sys.stderr)
+    except FileNotFoundError:
+        print(f"ERROR: {input_csv} not found. Cannot generate summary without latency data.", file=sys.stderr)
+        return
+    except Exception as e:
+        print(f"ERROR: Unexpected error reading {input_csv}: {e}", file=sys.stderr)
+        return
+    
+    # === LAYER 3: Read ENT CSV (optional) with error recovery ===
+    ent_data_by_model = {}
+    if ent_csv and os.path.exists(ent_csv):
+        try:
+            with open(ent_csv, 'r', encoding='utf-8') as f:
+                reader = csv_module.DictReader(f)
+                for row in reader:
+                    model = row['Model']
+                    if model not in ent_data_by_model:
+                        ent_data_by_model[model] = []
+                    ent_data_by_model[model].append(row)
+        except csv_module.Error as e:
+            print(f"WARNING: CSV read error in {ent_csv}: {e}. Continuing without entropy metrics.", file=sys.stderr)
+        except Exception as e:
+            print(f"WARNING: Error reading {ent_csv}: {e}. Continuing without entropy metrics.", file=sys.stderr)
     
     # Aggregate per model
     numeric_cols = [
@@ -791,6 +820,8 @@ def main():
     ap.add_argument("--out", type=str, default="results.json")
     ap.add_argument("--csv-out", type=str, default="testing_process.csv")
     ap.add_argument("--ent-payload-mb", type=int, default=1, help="ENT test payload size in MB (default: 1)")
+    ap.add_argument("--skip-latency", action="store_true", help="Skip latency/memory benchmarking phase (testing_process.csv + results.json)")
+    ap.add_argument("--skip-ent", action="store_true", help="Skip ENT randomness testing phase (ENT_Test.csv)")
     args = ap.parse_args()
 
     random.seed(args.seed)
@@ -852,93 +883,138 @@ def main():
         "bandwidth": compute_bandwidth_summary(),  # Metric 4
     }
 
-    print(f"Running {args.iterations} valid iterations per model (+ 100 warmup)...")
-    print(f"Payload: {args.payload_bytes} bytes")
-    print(f"CSV output: {args.csv_out}")
+    # =====================================================================
+    # PHASE 1: LATENCY BENCHMARKING (produces testing_process.csv + JSON stats)
+    # =====================================================================
+    if not args.skip_latency:
+        print(f"Running {args.iterations} valid iterations per model (+ 100 warmup)...")
+        print(f"Payload: {args.payload_bytes} bytes")
+        print(f"CSV output: {args.csv_out}")
+        print()
+
+        for m in models:
+            print(f"Benchmarking {m.name}...", end=" ", flush=True)
+            r = bench_model_enhanced(m, payload=payload, aad=aad, iterations=args.iterations, csv_writer=csv_writer)
+            results["models"].append(r)
+            print(" ✓")
+
+        csv_file.close()
+        print(f"✓ Closed {args.csv_out} (Phase 1 complete)")
+    else:
+        print("⊘ Skipping Phase 1 (latency benchmarking)")
+        csv_file.close()
     print()
 
-    for m in models:
-        print(f"Benchmarking {m.name}...", end=" ", flush=True)
-        r = bench_model_enhanced(m, payload=payload, aad=aad, iterations=args.iterations, csv_writer=csv_writer)
-        results["models"].append(r)
-        print(" ✓")
-
-    csv_file.close()
-
-    # Run ENT entropy tests (Metric 3) - 50 iterations per model
-    # FIX #3: Parallelize model testing for 4x speedup
+    # =====================================================================
+    # PHASE 2: ENT ENTROPY TESTING (produces ENT_Test.csv)
+    # =====================================================================
     ent_csv_path = "ENT_Test.csv"
-    print("\nRunning ENT randomness tests (50 iterations, parallel processing)...")
-    ent_iterations = 50
-    ent_file = open(ent_csv_path, 'w', newline='', buffering=1)
-    ent_fieldnames = ['Model', 'Iteration', 'Entropy_Bytes', 'Entropy_Bits_Per_Byte', 'Serial_Correlation_Coefficient', 'Status']
-    ent_writer_obj = csv.DictWriter(ent_file, fieldnames=ent_fieldnames, extrasaction='ignore')
-    ent_writer_obj.writeheader()
-    
     ent_all_results = {}
     
-    # FIX #3: Use ThreadPoolExecutor to run models in parallel
-    from concurrent.futures import ThreadPoolExecutor
-    import threading
-    
-    csv_lock = threading.Lock()
-    
-    def run_ent_and_log(m):
-        """Run ENT tests for a single model."""
-        ent_results = run_ent_entropy_test(m, iterations=ent_iterations, payload_mb=args.ent_payload_mb)
+    if not args.skip_ent:
+        print("Running ENT randomness tests (50 iterations, parallel processing)...")
+        ent_iterations = 50
+        ent_file = open(ent_csv_path, 'w', newline='', buffering=1)
+        ent_fieldnames = ['Model', 'Iteration', 'Entropy_Bytes', 'Entropy_Bits_Per_Byte', 'Serial_Correlation_Coefficient', 'Status']
+        ent_writer_obj = csv.DictWriter(ent_file, fieldnames=ent_fieldnames, extrasaction='ignore')
+        ent_writer_obj.writeheader()
         
-        success_count = 0
-        with csv_lock:
-            for ent_result in ent_results:
-                ent_writer_obj.writerow({
-                    'Model': ent_result.get('model'),
-                    'Iteration': ent_result.get('iteration'),
-                    'Entropy_Bytes': ent_result.get('entropy_bytes', ''),
-                    'Entropy_Bits_Per_Byte': ent_result.get('entropy_bits_per_byte', ''),
-                    'Serial_Correlation_Coefficient': ent_result.get('serial_correlation_coefficient', ''),
-                    'Status': ent_result.get('status'),
-                })
-                # Count success only if BOTH entropy AND serial correlation are measured
-                if (ent_result.get('status') == 'success' and 
-                    ent_result.get('entropy_bits_per_byte') is not None and
-                    ent_result.get('serial_correlation_coefficient') is not None):
-                    success_count += 1
+        # FIX #3: Use ThreadPoolExecutor to run models in parallel
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
         
-        return m.name, ent_results, success_count
-    
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(run_ent_and_log, m): m for m in models}
+        csv_lock = threading.Lock()
         
-        for future in futures:
-            try:
-                model_name, ent_results, success_count = future.result()
-                ent_all_results[model_name] = ent_results
-                print(f"  {model_name}...", end=" ", flush=True)
-                print(f" ✓ ({success_count}/{ent_iterations} successful)")
-            except Exception as e:
-                print(f"  ERROR: {e}", flush=True)
+        def run_ent_and_log(m):
+            """Run ENT tests for a single model."""
+            ent_results = run_ent_entropy_test(m, iterations=ent_iterations, payload_mb=args.ent_payload_mb)
+            
+            success_count = 0
+            with csv_lock:
+                for ent_result in ent_results:
+                    ent_writer_obj.writerow({
+                        'Model': ent_result.get('model'),
+                        'Iteration': ent_result.get('iteration'),
+                        'Entropy_Bytes': ent_result.get('entropy_bytes', ''),
+                        'Entropy_Bits_Per_Byte': ent_result.get('entropy_bits_per_byte', ''),
+                        'Serial_Correlation_Coefficient': ent_result.get('serial_correlation_coefficient', ''),
+                        'Status': ent_result.get('status'),
+                    })
+                    # Count success only if BOTH entropy AND serial correlation are measured
+                    if (ent_result.get('status') == 'success' and 
+                        ent_result.get('entropy_bits_per_byte') is not None and
+                        ent_result.get('serial_correlation_coefficient') is not None):
+                        success_count += 1
+            
+            return m.name, ent_results, success_count
+        
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {executor.submit(run_ent_and_log, m): m for m in models}
+            
+            for future in futures:
+                try:
+                    model_name, ent_results, success_count = future.result()
+                    ent_all_results[model_name] = ent_results
+                    print(f"  {model_name}...", end=" ", flush=True)
+                    print(f" ✓ ({success_count}/{ent_iterations} successful)")
+                except Exception as e:
+                    print(f"  ERROR: {e}", flush=True)
+        
+        ent_file.close()
+        print(f"✓ Closed {ent_csv_path} (Phase 2 complete)")
+    else:
+        print("⊘ Skipping Phase 2 (ENT entropy testing)")
+    print()
     
-    ent_file.close()
-    print(f"✓ Wrote {ent_csv_path}")
-    
-    # Generate summary CSV: testing_summary.csv with one row per model with means
+    # =====================================================================
+    # PHASE 3: SUMMARY GENERATION (combines Phase 1 + Phase 2)
+    # =====================================================================
+    print("Generating summary statistics...")
     summary_csv_path = args.csv_out.replace('.csv', '_summary.csv')
-    generate_summary_csv(args.csv_out, summary_csv_path, ent_csv_path)
-    print(f"✓ Wrote {summary_csv_path}")
+    
+    # Summary requires BOTH latency AND ENT data from this invocation
+    # If only one phase ran, we don't have complete inputs
+    if (not args.skip_latency) and (not args.skip_ent):
+        generate_summary_csv(args.csv_out, summary_csv_path, ent_csv_path)
+        print(f"✓ Wrote {summary_csv_path} (Phase 3 complete)")
+    else:
+        print("⊘ Skipping Phase 3 (summary requires both latency + ENT inputs from this invocation)")
     
     results["ent_entropy"] = ent_all_results  # Metric 3
     
-    # Write JSON results
+    # === Write JSON results ===
+    print(f"\nWriting JSON results to {args.out}...")
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, sort_keys=True)
-
-    print()
     print(f"✓ Wrote {args.out}")
-    print(f"✓ Wrote {args.csv_out}")
-    print(f"✓ Wrote {summary_csv_path}")
+
+    # === Final Summary Report ===
     print()
-    print(f"Summary: {args.iterations} valid iterations × 4 models = {args.iterations * 4} rows in {args.csv_out}")
-    print(f"(Plus 100 warmup iterations per model, discarded from CSV)")
+    print("="*70)
+    print("EXECUTION SUMMARY")
+    print("="*70)
+    if not args.skip_latency:
+        print(f"✓ Phase 1 (Latency): {args.iterations} valid iterations × 4 models")
+        print(f"  └─ {args.iterations * 4} rows in {args.csv_out}")
+        print(f"  └─ (Plus 100 warmup iterations per model, discarded from CSV)")
+    else:
+        print("⊘ Phase 1 (Latency): SKIPPED")
+    
+    if not args.skip_ent:
+        print(f"✓ Phase 2 (ENT Entropy): 50 iterations × 4 models")
+        print(f"  └─ 200 rows in {ent_csv_path}")
+    else:
+        print("⊘ Phase 2 (ENT Entropy): SKIPPED")
+    
+    # Phase 3 runs only if BOTH Phase 1 AND Phase 2 completed
+    if (not args.skip_latency) and (not args.skip_ent):
+        print(f"✓ Phase 3 (Summary): aggregated statistics")
+        print(f"  └─ One row per model in {summary_csv_path}")
+    else:
+        print("⊘ Phase 3 (Summary): SKIPPED (requires both Phase 1 + Phase 2)")
+    
+    print(f"✓ JSON output: {args.out}")
+    print("="*70)
 
 
 if __name__ == "__main__":
