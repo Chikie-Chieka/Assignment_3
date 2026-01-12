@@ -15,18 +15,10 @@ import time
 import tracemalloc
 from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional, Tuple
-
-# Import randomness tests
-try:
-    from randomness_tests import shannon_entropy_bits_per_byte, monobit_zscore, chi_square_pvalue
-    HAS_RANDOMNESS_TESTS = True
-except ImportError:
-    HAS_RANDOMNESS_TESTS = False
-
 import math
 
 # ----------------------------
-# Dependency helpers (unchanged)
+# Dependency helpers 
 # ----------------------------
 
 def _import_liboqs():
@@ -236,16 +228,10 @@ class ModelA_Kyber512(HybridModel):
         return pt, dec_ns
 
 
-class ModelB_BIKE_L1(ModelA_Kyber512):
+class ModelB_X25519(HybridModel):
+    """X25519 classical ECC key exchange + Ascon-128a"""
     def __init__(self, ascon_adapter: AsconAdapter):
-        super().__init__(ascon_adapter)
-        self.name = "ModelB_BIKE_L1"
-        self.kem_name = "BIKE-L1"
-
-
-class ModelC_X25519(HybridModel):
-    def __init__(self, ascon_adapter: AsconAdapter):
-        super().__init__("ModelC_X25519", ascon_adapter)
+        super().__init__("ModelB_X25519", ascon_adapter)
         PrivateKey, crypto_scalarmult = _import_pynacl()
         self.PrivateKey = PrivateKey
         self.crypto_scalarmult = crypto_scalarmult
@@ -289,9 +275,56 @@ class ModelC_X25519(HybridModel):
         return pt, dec_ns
 
 
-class ModelD_PSK_Ascon80pq(HybridModel):
+class ModelC_BIKE_L1(HybridModel):
+    """BIKE-L1 post-quantum KEM + Ascon-128a"""
+    def __init__(self, ascon_adapter: AsconAdapter):
+        super().__init__("ModelC_BIKE_L1", ascon_adapter)
+        self.oqs = _import_liboqs()
+        self.kem_name = "BIKE-L1"
+        self._server_public_key = None
+        self._server_secret_key = None
+
+    def setup(self) -> None:
+        with self.oqs.KeyEncapsulation(self.kem_name) as kem:
+            pk = kem.generate_keypair()
+            sk = kem.export_secret_key()
+        self._server_public_key = pk
+        self._server_secret_key = sk
+
+    def establish_shared_secret(self) -> Tuple[bytes, int, int]:
+        t0 = time.process_time_ns()
+        with self.oqs.KeyEncapsulation(self.kem_name) as client_kem:
+            ct, ss_client = client_kem.encap_secret(self._server_public_key)
+        t1 = time.process_time_ns()
+
+        t2 = time.process_time_ns()
+        with self.oqs.KeyEncapsulation(self.kem_name, secret_key=self._server_secret_key) as server_kem:
+            ss_server = server_kem.decap_secret(ct)
+        t3 = time.process_time_ns()
+
+        if ss_client != ss_server:
+            raise ValueError("KEM shared secret mismatch")
+
+        return ss_client, t1 - t0, t3 - t2
+
+    def derive_dem_key(self, ss: bytes) -> Tuple[bytes, int]:
+        t0 = time.process_time_ns()
+        key = hkdf_sha256(ss, length=16, salt=b"hybrid-bench-salt", info=b"ascon-128a-key")
+        t1 = time.process_time_ns()
+        return key, t1 - t0
+
+    def encrypt(self, key: bytes, plaintext: bytes, aad: bytes = b"") -> Tuple[bytes, bytes, bytes, int]:
+        nonce, ct, tag, enc_ns = self.ascon.encrypt(key, plaintext, aad=aad, variant="Ascon-128a")
+        return nonce, ct, tag, enc_ns
+
+    def decrypt(self, key: bytes, nonce: bytes, ct: bytes, tag: bytes, aad: bytes = b"") -> Tuple[bytes, int]:
+        pt, dec_ns = self.ascon.decrypt(key, nonce, ct, tag, aad=aad, variant="Ascon-128a")
+        return pt, dec_ns
+
+
+class ModelD_Ascon80pq(HybridModel):
     def __init__(self, ascon_adapter: AsconAdapter, psk_20_bytes: bytes):
-        super().__init__("ModelD_PSK_Ascon80pq", ascon_adapter)
+        super().__init__("ModelD_Ascon80pq", ascon_adapter)
         if len(psk_20_bytes) != 20:
             raise ValueError("ModelD requires a fixed 20-byte PSK for Ascon-80pq")
         self.psk = psk_20_bytes
@@ -325,21 +358,21 @@ BANDWIDTH_COSTS = {
         "total_bytes": 1568,
         "description": "Kyber-512 PK (800B) + CT (768B) for KEM + Ascon-128a AEAD",
     },
-    "ModelB_BIKE_L1": {
-        "pk_bytes": 1282,
-        "ct_bytes": 1282,
-        "tag_bytes": 0,
-        "total_bytes": 2564,
-        "description": "BIKE-L1 PK (1282B) + CT (1282B) for KEM + Ascon-128a AEAD",
-    },
-    "ModelC_X25519": {
+    "ModelB_X25519": {
         "pk_bytes": 32,
         "ct_bytes": 32,
         "tag_bytes": 0,
         "total_bytes": 64,
         "description": "X25519 ECDH PK (32B) + SS (32B) for KEM + Ascon-128a AEAD",
     },
-    "ModelD_PSK_Ascon80pq": {
+    "ModelC_BIKE_L1": {
+        "pk_bytes": 1541,
+        "ct_bytes": 1573,
+        "tag_bytes": 0,
+        "total_bytes": 3114,
+        "description": "BIKE-L1 (Round 3) PK (1541B) + CT (1573B) for KEM + Ascon-128a AEAD",
+    },
+    "ModelD_Ascon80pq": {
         "pk_bytes": 0,
         "ct_bytes": 0,
         "tag_bytes": 16,
@@ -359,9 +392,9 @@ def compute_bandwidth_summary() -> Dict[str, Any]:
         "models": BANDWIDTH_COSTS,
         "comparison_notes": [
             f"Kyber-512: {BANDWIDTH_COSTS['ModelA_Kyber512']['total_bytes']} bytes (PQC)",
-            f"X25519: {BANDWIDTH_COSTS['ModelC_X25519']['total_bytes']} bytes (classical ECC)",
-            f"Ratio: {BANDWIDTH_COSTS['ModelA_Kyber512']['total_bytes'] / BANDWIDTH_COSTS['ModelC_X25519']['total_bytes']:.1f}× larger",
-            f"Ascon-80pq: {BANDWIDTH_COSTS['ModelD_PSK_Ascon80pq']['total_bytes']} bytes (symmetric baseline, no KEM)",
+            f"X25519: {BANDWIDTH_COSTS['ModelB_X25519']['total_bytes']} bytes (classical ECC)",
+            f"Ratio: {BANDWIDTH_COSTS['ModelA_Kyber512']['total_bytes'] / BANDWIDTH_COSTS['ModelB_X25519']['total_bytes']:.1f}× larger",
+            f"Ascon-80pq: {BANDWIDTH_COSTS['ModelD_Ascon80pq']['total_bytes']} bytes (symmetric baseline, no KEM)",
         ],
     }
 
@@ -393,8 +426,6 @@ def run_ent_entropy_test(model: HybridModel, iterations: int = 50, payload_mb: i
             "status": str,
         }
     """
-    import subprocess
-    
     results = []
     
     for iteration_num in range(1, iterations + 1):
@@ -550,8 +581,9 @@ def bench_model_enhanced(
         }
         return row
     
-    # Start tracemalloc for memory profiling (FIX: start once at beginning)
-    tracemalloc.start()
+    # Start tracemalloc for memory profiling safely
+    if not tracemalloc.is_tracing():
+        tracemalloc.start()
     
     # Measure model setup (KeyGen) once per model
     keygen_t0 = time.process_time_ns()
@@ -730,7 +762,9 @@ def generate_summary_csv(input_csv: str, output_csv: str, ent_csv: str = None) -
     ent_cols = ['Entropy_Bits_Per_Byte', 'Serial_Correlation_Coefficient']
     
     summary_rows = []
-    for model in ['ModelA_Kyber512', 'ModelB_BIKE_L1', 'ModelC_X25519', 'ModelD_PSK_Ascon80pq']:
+    # Derive models dynamically from CSV data
+    unique_models = sorted(list(set(data_by_model.keys()) | set(ent_data_by_model.keys())))
+    for model in unique_models:
         summary_row = {'Model': model}
         
         # Process latency metrics from testing_process.csv
@@ -835,9 +869,9 @@ def main():
 
     models: List[HybridModel] = [
         ModelA_Kyber512(ascon_adapter),
-        ModelB_BIKE_L1(ascon_adapter),
-        ModelC_X25519(ascon_adapter),
-        ModelD_PSK_Ascon80pq(ascon_adapter, psk_20_bytes=psk),
+        ModelB_X25519(ascon_adapter),
+        ModelC_BIKE_L1(ascon_adapter),
+        ModelD_Ascon80pq(ascon_adapter, psk_20_bytes=psk),
     ]
 
     # Open CSV file for writing (testing_process.csv with per-iteration detail)
@@ -908,7 +942,8 @@ def main():
     # =====================================================================
     # PHASE 2: ENT ENTROPY TESTING (produces ENT_Test.csv)
     # =====================================================================
-    ent_csv_path = "ENT_Test.csv"
+    # Derive ent_csv_path from args.csv_out to avoid file collisions
+    ent_csv_path = f"{os.path.splitext(args.csv_out)[0]}_ent{os.path.splitext(args.csv_out)[1]}"
     ent_all_results = {}
     
     if not args.skip_ent:
