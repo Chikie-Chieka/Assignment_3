@@ -13,41 +13,41 @@
 
 # Post-Quantum Cryptography: liboqs Python bindings
 # Provides Kyber512 and BIKE-L1 implementations
-oqs==0.14.1
+oqs
 
 # Classical ECDH: PyNaCl (libsodium bindings)
 # Provides X25519 elliptic curve cryptography
-PyNaCl==1.6.2
+PyNaCl
 
 # Symmetric AEAD Cipher: Ascon (lightweight, quantum-resistant)
 # Used as the Data Encapsulation Mechanism (DEM) for all models
-ascon==0.2.0
+ascon
 
 # ============================================================================
 # DATA PROCESSING & ANALYSIS
 # ============================================================================
 
 # Numerical computing
-numpy==1.24.0
+numpy
 
 # Scientific computing (statistics, optimization)
-scipy==1.11.0
+scipy
 
 # Data manipulation and CSV handling
-pandas==2.0.0
+pandas
 
 # Plotting and visualization
-matplotlib==3.7.0
+matplotlib
 
 # ============================================================================
 # PERFORMANCE PROFILING (Optional but Recommended)
 # ============================================================================
 
 # Memory profiling: @profile decorator and mprof tool
-memory-profiler==0.61.0
+memory-profiler
 
 # System utilities: CPU/memory monitoring
-psutil==7.2.1
+psutil
 
 # ============================================================================
 # NOTES
