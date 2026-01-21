@@ -3,7 +3,7 @@ TODO - DEADLINE 31/1:
         - Read the research on Kyber + Ascon128a to see why they chose 128a, as it still exposes weakness against Quantum (halves key size for bruteforce down to 2^64 which is weak). 
         - Also find more research on Ascon hybrids where applicable.
     HIGH PRIORITY:
-        - Migrate to C for faster speed
+        - DONE ~~Migrate to C for faster speed~~
         - Add these models:
             + Standalone:
                 1. BIKE
