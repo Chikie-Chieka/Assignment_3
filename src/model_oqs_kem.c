@@ -1,26 +1,36 @@
 #include "bench.h"
 #include "csv.h"
 #include "util.h"
-#include "ascon_api.h"
+#include "AsconAPI.h"
 
 #include <oqs/oqs.h>
 #include <string.h>
 #include <stdlib.h>
+#include <openssl/evp.h>
+#include <openssl/kdf.h>
 
-// TODO: replace with your python-equivalent KDF.
-// For now: derive Ascon-128a key/nonce by hashing ss (placeholder).
-#include <openssl/sha.h>
-
-static void kdf_placeholder_sha256(const uint8_t *ss, size_t ss_len,
-                                  uint8_t k16[16], uint8_t nonce16[16],
-                                  uint64_t *kdf_ns) {
-    uint8_t d[32];
+static int kdf_hkdf_sha256(const uint8_t *ikm, size_t ikm_len,
+                           uint8_t out_key[16], uint64_t *kdf_ns) {
     uint64_t t0 = now_ns_monotonic_raw();
-    SHA256(ss, ss_len, d);
-    memcpy(k16, d, 16);
-    memcpy(nonce16, d + 16, 16);
+    int ret = -1;
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
+    if (!pctx) goto out;
+
+    if (EVP_PKEY_derive_init(pctx) <= 0) goto out;
+    if (EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha256()) <= 0) goto out;
+    if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, (const unsigned char*)"hybrid-bench-salt", 17) <= 0) goto out;
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, ikm, ikm_len) <= 0) goto out;
+    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, (const unsigned char*)"ascon-128a-key", 14) <= 0) goto out;
+
+    size_t len = 16;
+    if (EVP_PKEY_derive(pctx, out_key, &len) <= 0) goto out;
+
+    ret = 0;
+out:
+    if (pctx) EVP_PKEY_CTX_free(pctx);
     uint64_t t1 = now_ns_monotonic_raw();
     *kdf_ns = t1 - t0;
+    return ret;
 }
 
 static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
@@ -44,35 +54,41 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     uint8_t *m = malloc(cfg->payload_len);
     if (!c || !m) goto out;
 
+    // 1. Measure KeyGen once, outside the loop (matches Python)
+    uint64_t t_kg0 = now_ns_monotonic_raw();
+    int kg_rc = OQS_KEM_keypair(kem, pk, sk);
+    uint64_t t_kg1 = now_ns_monotonic_raw();
+    uint64_t keygen_ns = t_kg1 - t_kg0;
+
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, model_name, sizeof(r.Model)-1);
-        r.Iteration = i - cfg->warmup;
-        r.Failed = 0;
+        r.Iteration = (i - cfg->warmup) + 1;
+        r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
+        r.KeyGen_ns = keygen_ns;
 
-        uint64_t t_begin = now_ns_monotonic_raw();
-
-        uint64_t t0 = now_ns_monotonic_raw();
-        if (OQS_KEM_keypair(kem, pk, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t1 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
 
-        r.KeyGen_ns = t1 - t0;
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
 
         if (!r.Failed && memcmp(ss_e, ss_d, kem->length_shared_secret) != 0) r.Failed = 1;
 
-        uint8_t k16[16], nonce16[16];
+        uint8_t k16[16];
         if (!r.Failed) {
-            kdf_placeholder_sha256(ss_d, kem->length_shared_secret, k16, nonce16, &r.KDF_ns);
+            if (kdf_hkdf_sha256(ss_d, kem->length_shared_secret, k16, &r.KDF_ns) != 0) {
+                r.Failed = 1;
+            }
 
+            uint8_t nonce16[16];
+            for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
+            
             uint64_t te0 = now_ns_monotonic_raw();
             size_t clen = 0;
-            // TODO: replace with your Ascon-128a implementation + exact aad handling
             if (ascon128a_aead_encrypt(c, &clen, cfg->payload, cfg->payload_len,
                                       (const uint8_t*)cfg->aad, strlen(cfg->aad),
                                       nonce16, k16) != 0) {
@@ -96,8 +112,8 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
         }
 
-        uint64_t t_end = now_ns_monotonic_raw();
-        r.Total_ns = t_end - t_begin;
+        // 2. Calculate Total_ns as a sum (matches Python)
+        r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Peak_Alloc_KB = peak_rss_kb();
 

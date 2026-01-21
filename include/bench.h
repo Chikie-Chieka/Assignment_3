@@ -9,8 +9,8 @@ typedef struct {
     int warmup;              // warmup iterations (python prints +100 warmup)
     int payload_bytes;
     const char *aad;
-    const char *seed;
-    const char *csv_out;
+    int seed;
+    int ent_payload_mb;
     bool skip_latency;
     bool skip_ent;
 
@@ -19,6 +19,8 @@ typedef struct {
     size_t payload_len;
     uint8_t psk20[20];       // for Ascon-80pq PSK-based mode, if needed
 } bench_config_t;
+
+void bench_parse_args(int argc, char **argv, bench_config_t *cfg);
 
 typedef struct {
     char Model[64];

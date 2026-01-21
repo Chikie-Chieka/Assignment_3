@@ -1,7 +1,8 @@
 #include "bench.h"
 #include "csv.h"
 #include "util.h"
-#include "ascon_api.h"
+#include "AsconAPI.h"
+#include <stdlib.h>
 #include <string.h>
 
 void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
@@ -10,9 +11,8 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, "ModelD_Ascon80pq", sizeof(r.Model)-1);
-        r.Iteration = i - cfg->warmup;
+        r.Iteration = (i - cfg->warmup) + 1;
 
-        uint64_t t_begin = now_ns_monotonic_raw();
         r.Failed = 0;
 
         // No KEM overhead
@@ -24,25 +24,48 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
         // For now: use cfg->psk20 directly and count KDF as 0.
         r.KDF_ns = 0;
 
-        uint8_t tag[16];
+        // Prepare buffers
+        // Ciphertext length = plaintext len + tag len (16)
+        size_t clen = cfg->payload_len + 16;
+        uint8_t *ct = (uint8_t*)malloc(clen);
+        uint8_t *pt = (uint8_t*)malloc(cfg->payload_len);
+        uint8_t nonce[16]; 
+        // Python: nonce = os.urandom(16) (outside timing)
+        // We use a dummy nonce here or rand() to avoid I/O overhead, matching logic that nonce exists.
+        memset(nonce, 0xAA, 16); 
+
         uint64_t te0 = now_ns_monotonic_raw();
-        if (ascon80pq_tag16_compute(tag,
+        if (ascon80pq_aead_encrypt(ct, &clen,
                                    cfg->payload, cfg->payload_len,
                                    (const uint8_t*)cfg->aad, strlen(cfg->aad),
+                                   nonce,
                                    cfg->psk20) != 0) {
             r.Failed = 1;
         }
         uint64_t te1 = now_ns_monotonic_raw();
 
-        // “Decryption” for tag-only could be verify; measure similarly if you have it.
-        // TODO: implement verify() and measure it; for now set 0.
-        r.Encryption_ns = te1 - te0;
-        r.Decryption_ns = 0;
+        uint64_t td0 = now_ns_monotonic_raw();
+        size_t mlen = 0;
+        if (!r.Failed && ascon80pq_aead_decrypt(pt, &mlen, ct, clen,
+                                               (const uint8_t*)cfg->aad, strlen(cfg->aad),
+                                               nonce, cfg->psk20) != 0) {
+            r.Failed = 1;
+        }
+        uint64_t td1 = now_ns_monotonic_raw();
 
-        uint64_t t_end = now_ns_monotonic_raw();
-        r.Total_ns = t_end - t_begin;
+        r.Encryption_ns = te1 - te0;
+        r.Decryption_ns = td1 - td0;
+
+        if (!r.Failed && (mlen != cfg->payload_len || memcmp(pt, cfg->payload, mlen) != 0)) {
+            r.Failed = 1;
+        }
+
+        // 2. Calculate Total_ns as a sum (matches Python)
+        r.Total_ns = r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Peak_Alloc_KB = peak_rss_kb();
+
+        free(ct); free(pt);
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
