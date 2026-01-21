@@ -11,6 +11,7 @@ typedef struct {
     const char *aad;
     int seed;
     int ent_payload_mb;
+    int ent_iterations;
     bool skip_latency;
     bool skip_ent;
 

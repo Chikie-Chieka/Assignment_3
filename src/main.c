@@ -17,6 +17,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
     cfg->aad = "";
     cfg->seed = 1337;
     cfg->ent_payload_mb = 1;
+    cfg->ent_iterations = 50;
     cfg->skip_latency = false;
     cfg->skip_ent = false;
 
@@ -25,6 +26,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
         {"payload-bytes", required_argument, 0, 'p'},
         {"aad", required_argument, 0, 'a'},
         {"seed", required_argument, 0, 's'},
+        {"ent-iterations", required_argument, 0, 'I'},
         {"ent-payload-mb", required_argument, 0, 'e'},
         {"skip-latency", no_argument, 0, 'L'},
         {"skip-ent", no_argument, 0, 'E'},
@@ -34,12 +36,13 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "i:p:a:s:e:LEh", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "i:p:a:s:I:e:LEh", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'i': cfg->iterations = atoi(optarg); break;
             case 'p': cfg->payload_bytes = atoi(optarg); break;
             case 'a': cfg->aad = optarg; break;
             case 's': cfg->seed = atoi(optarg); break;
+            case 'I': cfg->ent_iterations = atoi(optarg); break;
             case 'e': cfg->ent_payload_mb = atoi(optarg); break;
             case 'L': cfg->skip_latency = true; break;
             case 'E': cfg->skip_ent = true; break;
@@ -47,6 +50,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
                 printf("usage: %s [-h] [--iterations ITERATIONS] [--payload-bytes PAYLOAD_BYTES]\n", argv[0]);
                 printf("          [--aad AAD] [--seed SEED]\n");
                 printf("          [--ent-payload-mb ENT_PAYLOAD_MB] [--skip-latency] [--skip-ent]\n\n");
+                printf("          [--ent-iterations ENT_ITERATIONS]\n");
                 printf("optional arguments:\n");
                 printf("  -h, --help            show this help message and exit\n");
                 printf("  --iterations ITERATIONS\n");
@@ -55,6 +59,8 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
                 printf("                        (default: 4096)\n");
                 printf("  --aad AAD             (default: )\n");
                 printf("  --seed SEED           (default: 1337)\n");
+                printf("  --ent-iterations ENT_ITERATIONS\n");
+                printf("                        (default: 50)\n");
                 printf("  --ent-payload-mb ENT_PAYLOAD_MB\n");
                 printf("                        ENT test payload size in MB (default: 1)\n");
                 printf("  --skip-latency        Skip latency/memory benchmarking phase (testing_process.csv + results.json)\n");
@@ -143,7 +149,7 @@ int main(int argc, char **argv) {
         // Derive ENT filename: <csv_out>_ent.csv
         const char *ent_csv_path = "testing_process_ent.csv";
 
-        printf("Running ENT randomness tests (50 iterations, parallel processing)...\n");
+        printf("Running ENT randomness tests (%d iterations, %d MB payload each)...\n", cfg.ent_iterations, cfg.ent_payload_mb);
         if (run_ent_phase(&cfg, ent_csv_path) != 0) {
             fprintf(stderr, "ENT phase failed\n");
         } else {

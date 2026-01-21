@@ -150,8 +150,8 @@ typedef struct {
 
 static void *ent_thread_main(void *p) {
     ent_thread_arg_t *a = (ent_thread_arg_t*)p;
-    // Python: 50 iterations, 1-based index
-    for (int i = 1; i <= 50; i++) {
+    // Python: N iterations, 1-based index
+    for (int i = 1; i <= a->cfg->ent_iterations; i++) {
         uint8_t *buf = NULL;
         size_t n = 0;
         int rc = ent_generate_bytes_for_model(a->cfg, a->model_name, i, &buf, &n);
