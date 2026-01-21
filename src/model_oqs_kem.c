@@ -121,8 +121,11 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     }
 
 out:
-    if (pk) free(pk); if (sk) free(sk); if (ct) free(ct);
-    if (ss_e) free(ss_e); if (ss_d) free(ss_d);
+    if (pk) free(pk);
+    if (sk) free(sk);
+    if (ct) free(ct);
+    if (ss_e) free(ss_e);
+    if (ss_d) free(ss_d);
     OQS_KEM_free(kem);
 }
 

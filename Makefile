@@ -9,7 +9,9 @@ SRCS = src/main.c \
        src/models.c \
        src/model_oqs_kem.c \
        src/model_ascon80pq.c \
+       src/model_x25519.c \
        src/ent_phase.c \
+       src/ascon_impl.c
 
 # Object files
 OBJS = $(SRCS:.c=.o)
