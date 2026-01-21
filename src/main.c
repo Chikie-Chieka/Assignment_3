@@ -17,7 +17,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
     cfg->aad = "";
     cfg->seed = 1337;
     cfg->ent_payload_mb = 1;
-    cfg->ent_iterations = 50;
+    cfg->ent_iterations = 100;
     cfg->skip_latency = false;
     cfg->skip_ent = false;
 

@@ -32,4 +32,6 @@ typedef struct {
     double Total_s;
     int Failed;
     long Peak_Alloc_KB;      // Linux ru_maxrss in KB
+    size_t Heap_Used_Bytes;
+    size_t Heap_Used_Peak_Bytes;
 } csv_row_t;

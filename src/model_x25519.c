@@ -77,6 +77,7 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     uint64_t t_kg1 = now_ns_monotonic_raw();
     uint64_t keygen_ns = t_kg1 - t_kg0;
 
+    size_t peak_heap = 0;
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, "ModelB_X25519", sizeof(r.Model)-1);
@@ -137,6 +138,11 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
         r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Peak_Alloc_KB = peak_rss_kb();
+        
+        size_t current_heap = current_heap_bytes();
+        if (current_heap > peak_heap) peak_heap = current_heap;
+        r.Heap_Used_Bytes = current_heap;
+        r.Heap_Used_Peak_Bytes = peak_heap;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }

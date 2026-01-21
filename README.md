@@ -54,4 +54,6 @@ To quantify performance and security robustness, all models were subjected to a 
 
 ---
 
-Would you like me to draft a Python snippet for calculating the Shannon Entropy or SCC for your dataset?
+## 4. How to run
+
+To measure memory usage, use Valgrind or similar external tool for byte-precise memory measurement, the current implementation of the program measure memory by page, which is too big to measure changes of 4096 bytes payloads.

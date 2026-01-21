@@ -5,6 +5,7 @@
 #include <openssl/sha.h>
 #include <string.h>
 #include <stdio.h>
+#include <malloc.h>
 
 uint64_t now_ns_monotonic_raw(void) {
     struct timespec ts;
@@ -24,4 +25,9 @@ void psk20_from_seed_sha256(const char *seed, uint8_t out20[20]) {
     snprintf(buf, sizeof(buf), "psk|%s", seed ? seed : "");
     SHA256((const unsigned char*)buf, strlen(buf), d);
     memcpy(out20, d, 20);
+}
+
+size_t current_heap_bytes(void) {
+    struct mallinfo2 m = mallinfo2();
+    return m.uordblks;
 }
