@@ -16,9 +16,9 @@ TODO - DEADLINE 31/1:
                 ~~1. Classic McEliece + Ascon-128a~~
                 ~~2. FrodoKEM + Ascon-128a~~
                 ~~3. HQC + Ascon-128a~~
-        - Create environment to limit CPU cores and RAM
+        - Acceptably satisfied via using systemd-run, CPU is mathematically calculated, while RAM usage is virtually insignificant even at 65536 bytes payload per iteration ~~Create environment to limit CPU cores and RAM~~
     MEDIUM PRIORITY:
-        - Add monitor to track CPU % and have better Memory track (for each iterations instead of accrueing peak RAM)
+        - Read the above ~~Add monitor to track CPU % and have better Memory track (for each iterations instead of accrueing peak RAM)~~
     LOW PRIORTITY but must be done before 25/1:
         - Write the first draft for the paper again, following the guide from this prof: https://www.youtube.com/watch?v=UY7sVKJPTMA
         - Get consultation from professors, asking questions on:
