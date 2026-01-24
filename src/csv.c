@@ -14,7 +14,7 @@ void csv_write_header(csv_writer_t *w) {
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp,
         "Model,Iteration,KeyGen_ns,Encaps_ns,Decaps_ns,KDF_ns,"
-        "Encryption_ns,Decryption_ns,Total_ns,Total_s,Failed,Peak_Alloc_KB\n");
+        "Encryption_ns,Decryption_ns,Total_ns,Total_s,Cpu_Pct,Failed,Peak_Alloc_KB,Peak_RSS_KB\n");
     fflush(w->fp);
     pthread_mutex_unlock(&w->mu);
 }
@@ -23,7 +23,7 @@ void csv_write_row(csv_writer_t *w, const csv_row_t *r) {
     if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp,
-        "%s,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%.9f,%d,%ld\n",
+        "%s,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%.9f,%.2f,%d,%ld,%ld\n",
         r->Model, r->Iteration,
         (unsigned long long)r->KeyGen_ns,
         (unsigned long long)r->Encaps_ns,
@@ -33,8 +33,10 @@ void csv_write_row(csv_writer_t *w, const csv_row_t *r) {
         (unsigned long long)r->Decryption_ns,
         (unsigned long long)r->Total_ns,
         r->Total_s,
+        r->Cpu_Pct,
         r->Failed,
-        r->Peak_Alloc_KB
+        r->Peak_Alloc_KB,
+        r->Peak_RSS_KB
     );
     fflush(w->fp);
     pthread_mutex_unlock(&w->mu);

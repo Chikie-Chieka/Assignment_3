@@ -6,8 +6,20 @@
 #include <oqs/oqs.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
+
+static double cpu_pct_process_window(const struct timespec *w0, const struct timespec *w1,
+                                     const struct timespec *c0, const struct timespec *c1,
+                                     double ncpu) {
+    double wall = (double)(w1->tv_sec - w0->tv_sec) +
+                  (double)(w1->tv_nsec - w0->tv_nsec) / 1e9;
+    double cpu = (double)(c1->tv_sec - c0->tv_sec) +
+                 (double)(c1->tv_nsec - c0->tv_nsec) / 1e9;
+    if (wall <= 0.0 || ncpu <= 0.0) return 0.0;
+    return 100.0 * (cpu / (wall * (double)ncpu));
+}
 
 static int kdf_hkdf_sha256(const uint8_t *ikm, size_t ikm_len,
                            uint8_t out_key[16], uint64_t *kdf_ns) {
@@ -44,14 +56,16 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     uint8_t *ct = malloc(kem->length_ciphertext);
     uint8_t *ss_e = malloc(kem->length_shared_secret);
     uint8_t *ss_d = malloc(kem->length_shared_secret);
+    uint8_t *c = NULL;
+    uint8_t *m = NULL;
     if (!pk || !sk || !ct || !ss_e || !ss_d) goto out;
 
     int total = cfg->warmup + cfg->iterations;
 
     // ciphertext buffer for DEM: payload + 16B tag (typical AEAD)
     size_t ccap = cfg->payload_len + 16;
-    uint8_t *c = malloc(ccap);
-    uint8_t *m = malloc(cfg->payload_len);
+    c = malloc(ccap);
+    m = malloc(cfg->payload_len);
     if (!c || !m) goto out;
 
     // 1. Measure KeyGen once, outside the loop (matches Python)
@@ -60,18 +74,29 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     uint64_t t_kg1 = now_ns_monotonic_raw();
     uint64_t keygen_ns = t_kg1 - t_kg0;
 
+    double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, model_name, sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
         r.KeyGen_ns = keygen_ns;
+        long rss_peak_kb = current_rss_kb();
+        if (rss_peak_kb < 0) rss_peak_kb = 0;
+
+        struct timespec w0, w1, c0, c1;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
 
         uint64_t t1 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
+        long rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
+        rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -83,6 +108,8 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
             if (kdf_hkdf_sha256(ss_d, kem->length_shared_secret, k16, &r.KDF_ns) != 0) {
                 r.Failed = 1;
             }
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint8_t nonce16[16];
             for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
@@ -95,6 +122,8 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
             }
             uint64_t te1 = now_ns_monotonic_raw();
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint64_t td0 = now_ns_monotonic_raw();
             size_t mlen = 0;
@@ -104,6 +133,8 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
             }
             uint64_t td1 = now_ns_monotonic_raw();
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             r.Encryption_ns = te1 - te0;
             r.Decryption_ns = td1 - td0;
@@ -112,15 +143,22 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
         }
 
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Peak_Alloc_KB = peak_rss_kb();
+        r.Peak_RSS_KB = rss_peak_kb;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
 out:
+    if (c) free(c);
+    if (m) free(m);
     if (pk) free(pk);
     if (sk) free(sk);
     if (ct) free(ct);
@@ -150,27 +188,43 @@ static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
     uint64_t t_kg1 = now_ns_monotonic_raw();
     uint64_t keygen_ns = t_kg1 - t_kg0;
 
+    double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, model_name, sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
         r.KeyGen_ns = keygen_ns;
+        long rss_peak_kb = current_rss_kb();
+        if (rss_peak_kb < 0) rss_peak_kb = 0;
+
+        struct timespec w0, w1, c0, c1;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
 
         uint64_t t1 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
+        long rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
+        rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
 
         if (!r.Failed && memcmp(ss_e, ss_d, kem->length_shared_secret) != 0) r.Failed = 1;
 
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+
         r.Total_ns = r.Encaps_ns + r.Decaps_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Peak_Alloc_KB = peak_rss_kb();
+        r.Peak_RSS_KB = rss_peak_kb;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }

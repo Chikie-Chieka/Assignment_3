@@ -3,6 +3,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+enum {
+    SINGLE_THREAD_NONE = 0,
+    SINGLE_THREAD_PARTIAL = 1,
+    SINGLE_THREAD_FULL = 2
+};
+
 typedef struct {
     // CLI (names must be aligned to python; adjust after you paste argparse)
     int iterations;          // valid iterations per model
@@ -16,6 +22,7 @@ typedef struct {
     bool skip_ent;
     bool no_csv;
     int model_id;            // 0 = all, 1..4 = specific model
+    int single_thread_mode;  // 1 = partial (Phase 1 sequential), 2 = full (no threads)
 
     // Derived
     uint8_t *payload;
@@ -32,6 +39,8 @@ typedef struct {
     uint64_t KDF_ns, Encryption_ns, Decryption_ns;
     uint64_t Total_ns;
     double Total_s;
+    double Cpu_Pct;          // 100 * cpu_time / (wall_time * Ncpu)
     int Failed;
     long Peak_Alloc_KB;      // Linux ru_maxrss in KB
+    long Peak_RSS_KB;        // VmRSS peak during iteration window
 } csv_row_t;

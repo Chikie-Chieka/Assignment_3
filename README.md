@@ -78,6 +78,9 @@ Applicable parameters/arguments:
   --skip-ent            Skip ENT randomness testing phase (ENT_Test.csv)
   --no-csv, --output none
                         Disable all CSV output files
+  --single-thread {full|partial}
+                        full: no worker threads in Phase 1 or Phase 2
+                        partial: Phase 1 sequential, Phase 2 parallel (default)
   --model N             Run exactly one model:
                         1=Standalone_Ascon_80pq
                         2=Standalone_BIKE_L1

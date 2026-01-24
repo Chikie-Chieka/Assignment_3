@@ -58,6 +58,10 @@ static void bench_print_help(const char *prog) {
     printf("  --skip-ent            Skip ENT randomness testing phase (ENT_Test.csv)\n");
     printf("  --no-csv, --output none\n");
     printf("                        Disable all CSV output files\n");
+    printf("  --single-thread {none|full|partial}\n");
+    printf("                        none: Phase 1 + Phase 2 use worker threads (default)\n");
+    printf("                        full: no worker threads in Phase 1 or Phase 2\n");
+    printf("                        partial: Phase 1 sequential, Phase 2 parallel\n");
     printf("  --model N             Run exactly one model:\n");
     printf("                        1=Standalone_Ascon_80pq\n");
     printf("                        2=Standalone_BIKE_L1\n");
@@ -84,6 +88,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
     cfg->skip_ent = false;
     cfg->no_csv = false;
     cfg->model_id = 0;
+    cfg->single_thread_mode = SINGLE_THREAD_NONE;
 
     static struct option long_options[] = {
         {"iterations", required_argument, 0, 'i'},
@@ -96,6 +101,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
         {"skip-ent", no_argument, 0, 'E'},
         {"no-csv", no_argument, 0, 'n'},
         {"output", required_argument, 0, 'o'},
+        {"single-thread", required_argument, 0, 't'},
         {"model", required_argument, 0, 'm'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
@@ -103,7 +109,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "i:p:a:s:I:e:LEno:m:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "i:p:a:s:I:e:LEno:t:m:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'i': cfg->iterations = atoi(optarg); break;
             case 'p': cfg->payload_bytes = atoi(optarg); break;
@@ -117,6 +123,18 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
             case 'o':
                 if (strcmp(optarg, "none") == 0) {
                     cfg->no_csv = true;
+                } else {
+                    bench_print_help(argv[0]);
+                    exit(1);
+                }
+                break;
+            case 't':
+                if (strcmp(optarg, "none") == 0) {
+                    cfg->single_thread_mode = SINGLE_THREAD_NONE;
+                } else if (strcmp(optarg, "full") == 0) {
+                    cfg->single_thread_mode = SINGLE_THREAD_FULL;
+                } else if (strcmp(optarg, "partial") == 0) {
+                    cfg->single_thread_mode = SINGLE_THREAD_PARTIAL;
                 } else {
                     bench_print_help(argv[0]);
                     exit(1);
@@ -152,6 +170,12 @@ static int run_latency_model(const bench_config_t *cfg, csv_writer_t *csv,
     arg.cfg = cfg;
     arg.csv = csv;
     arg.kind = kind;
+
+    if (cfg->single_thread_mode != SINGLE_THREAD_NONE) {
+        model_thread_main(&arg);
+        printf("✓\n");
+        return 0;
+    }
 
     // We run in a thread to match the structure, though we join immediately
     pthread_t th;

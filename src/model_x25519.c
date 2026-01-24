@@ -6,6 +6,18 @@
 #include <openssl/kdf.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+
+static double cpu_pct_process_window(const struct timespec *w0, const struct timespec *w1,
+                                     const struct timespec *c0, const struct timespec *c1,
+                                     double ncpu) {
+    double wall = (double)(w1->tv_sec - w0->tv_sec) +
+                  (double)(w1->tv_nsec - w0->tv_nsec) / 1e9;
+    double cpu = (double)(c1->tv_sec - c0->tv_sec) +
+                 (double)(c1->tv_nsec - c0->tv_nsec) / 1e9;
+    if (wall <= 0.0 || ncpu <= 0.0) return 0.0;
+    return 100.0 * (cpu / (wall * (double)ncpu));
+}
 
 static int x25519_keypair(EVP_PKEY **out) {
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
@@ -77,12 +89,19 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     uint64_t t_kg1 = now_ns_monotonic_raw();
     uint64_t keygen_ns = t_kg1 - t_kg0;
 
+    double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, "ModelB_X25519", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;
+        long rss_peak_kb = current_rss_kb();
+        if (rss_peak_kb < 0) rss_peak_kb = 0;
+
+        struct timespec w0, w1, c0, c1;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
 
         uint64_t t1 = now_ns_monotonic_raw();
 
@@ -91,8 +110,12 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
 
         if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
+        long rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
+        rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -104,6 +127,8 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
             if (kdf_hkdf_sha256(ss_srv, ss_srv_len, k16, &r.KDF_ns) != 0) {
                 r.Failed = 1;
             }
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint8_t nonce16[16];
             for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
@@ -116,6 +141,8 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
                 r.Failed = 1;
             }
             uint64_t te1 = now_ns_monotonic_raw();
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint64_t td0 = now_ns_monotonic_raw();
             size_t mlen = 0;
@@ -125,18 +152,25 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
                 r.Failed = 1;
             }
             uint64_t td1 = now_ns_monotonic_raw();
+            rss_kb = current_rss_kb();
+            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             r.Encryption_ns = te1 - te0;
             r.Decryption_ns = td1 - td0;
 
-            if (!r.Failed && (mlen != cfg->payload_len || memcmp(m, cfg->payload, cfg->payload_len) != 0))
-                r.Failed = 1;
+        if (!r.Failed && (mlen != cfg->payload_len || memcmp(m, cfg->payload, cfg->payload_len) != 0))
+            r.Failed = 1;
         }
+
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
 
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Peak_Alloc_KB = peak_rss_kb();
+        r.Peak_RSS_KB = rss_peak_kb;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
@@ -158,12 +192,19 @@ void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
     uint64_t t_kg1 = now_ns_monotonic_raw();
     uint64_t keygen_ns = t_kg1 - t_kg0;
 
+    double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, "Standalone_X25519", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;
+        long rss_peak_kb = current_rss_kb();
+        if (rss_peak_kb < 0) rss_peak_kb = 0;
+
+        struct timespec w0, w1, c0, c1;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
 
         uint64_t t1 = now_ns_monotonic_raw();
 
@@ -172,17 +213,26 @@ void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
 
         if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
+        long rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
+        rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
 
         if (!r.Failed && (ss_cli_len != ss_srv_len || memcmp(ss_cli, ss_srv, ss_cli_len) != 0)) r.Failed = 1;
 
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+
         r.Total_ns = r.Encaps_ns + r.Decaps_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Peak_Alloc_KB = peak_rss_kb();
+        r.Peak_RSS_KB = rss_peak_kb;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }

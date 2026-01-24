@@ -4,16 +4,35 @@
 #include "AsconAPI.h"
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+static double cpu_pct_process_window(const struct timespec *w0, const struct timespec *w1,
+                                     const struct timespec *c0, const struct timespec *c1,
+                                     double ncpu) {
+    double wall = (double)(w1->tv_sec - w0->tv_sec) +
+                  (double)(w1->tv_nsec - w0->tv_nsec) / 1e9;
+    double cpu = (double)(c1->tv_sec - c0->tv_sec) +
+                 (double)(c1->tv_nsec - c0->tv_nsec) / 1e9;
+    if (wall <= 0.0 || ncpu <= 0.0) return 0.0;
+    return 100.0 * (cpu / (wall * (double)ncpu));
+}
 
 void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
 
+    double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
         strncpy(r.Model, "Standalone_Ascon_80pq", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
 
         r.Failed = 0;
+        long rss_peak_kb = current_rss_kb();
+        if (rss_peak_kb < 0) rss_peak_kb = 0;
+
+        struct timespec w0, w1, c0, c1;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
 
         // No KEM overhead
         r.KeyGen_ns = 0;
@@ -43,6 +62,8 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
             r.Failed = 1;
         }
         uint64_t te1 = now_ns_monotonic_raw();
+        long rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         uint64_t td0 = now_ns_monotonic_raw();
         size_t mlen = 0;
@@ -52,6 +73,8 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
             r.Failed = 1;
         }
         uint64_t td1 = now_ns_monotonic_raw();
+        rss_kb = current_rss_kb();
+        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encryption_ns = te1 - te0;
         r.Decryption_ns = td1 - td0;
@@ -60,10 +83,15 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
             r.Failed = 1;
         }
 
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Peak_Alloc_KB = peak_rss_kb();
+        r.Peak_RSS_KB = rss_peak_kb;
 
         free(ct); free(pt);
 

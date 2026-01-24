@@ -86,7 +86,6 @@ static double serial_correlation_coeff(const uint8_t *buf, size_t n) {
 // --------------------
 // Byte generation (MUST MATCH PYTHON)
 // --------------------
-// TODO: implement this to match experiment_final.py ENT semantics.
 // Common choice is to generate a fresh encryption output and test:
 // - For KEM+DEM models: (kem_ct || dem_ct || dem_tag) or (dem_ct || dem_tag)
 // - For X25519+DEM: (dem_ct || dem_tag)
@@ -201,6 +200,16 @@ int run_ent_phase(const bench_config_t *cfg, const char *ent_path) {
         { 9, { cfg, "Hybrid_FrodoKEM_640_AES_Ascon128a", wp } },
         { 10, { cfg, "Hybrid_HQC_128_Ascon128a", wp } },
     };
+
+    if (cfg->single_thread_mode == SINGLE_THREAD_FULL) {
+        int model_count = (int)(sizeof(models) / sizeof(models[0]));
+        for (int i = 0; i < model_count; i++) {
+            if (cfg->model_id != 0 && cfg->model_id != models[i].id) continue;
+            ent_thread_main(&models[i].arg);
+        }
+        if (!cfg->no_csv) ent_close(&w);
+        return 0;
+    }
 
     pthread_t th[10];
     int th_count = 0;
