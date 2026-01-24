@@ -28,6 +28,7 @@ static void ent_close(ent_writer_t *w) {
     pthread_mutex_destroy(&w->mu);
 }
 static void ent_write_header(ent_writer_t *w) {
+    if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp, "Model,Iteration,Entropy_Bytes,Entropy_Bits_Per_Byte,Serial_Correlation_Coefficient,Status\n");
     fflush(w->fp);
@@ -37,6 +38,7 @@ static void ent_write_row(ent_writer_t *w,
                           const char *model, int iter,
                           size_t entropy_bytes, double h_bits_per_byte,
                           double scc, const char *status) {
+    if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp, "%s,%d,%zu,%.12f,%.12f,%s\n",
             model, iter, entropy_bytes, h_bits_per_byte, scc, status);
@@ -116,7 +118,7 @@ static int ent_generate_bytes_for_model(const bench_config_t *cfg,
     size_t clen_out = 0;
     int res = -1;
 
-    if (strcmp(model_name, "ModelD_Ascon80pq") == 0) {
+    if (strcmp(model_name, "Standalone_Ascon_80pq") == 0) {
         // Ascon-80pq (20B key). We use the 16 random bytes + 4 zero bytes (from init)
         // to match Python passing 16B key to 80pq variant.
         res = ascon80pq_aead_encrypt(c, &clen_out, m, mlen, NULL, 0, n, k);
@@ -177,20 +179,43 @@ static void *ent_thread_main(void *p) {
 // --------------------
 int run_ent_phase(const bench_config_t *cfg, const char *ent_path) {
     ent_writer_t w;
-    if (ent_open(&w, ent_path) != 0) return -1;
-    ent_write_header(&w);
+    ent_writer_t *wp = NULL;
+    if (!cfg->no_csv) {
+        if (ent_open(&w, ent_path) != 0) return -1;
+        ent_write_header(&w);
+        wp = &w;
+    }
 
-    pthread_t th[4];
-    ent_thread_arg_t args[4] = {
-        { cfg, "ModelA_Kyber512",  &w },
-        { cfg, "ModelB_X25519",   &w },
-        { cfg, "ModelC_BIKE_L1",  &w },
-        { cfg, "ModelD_Ascon80pq",&w },
+    struct {
+        int id;
+        ent_thread_arg_t arg;
+    } models[] = {
+        { 1, { cfg, "Standalone_Ascon_80pq", wp } },
+        { 2, { cfg, "Standalone_BIKE_L1", wp } },
+        { 3, { cfg, "Standalone_Kyber512", wp } },
+        { 4, { cfg, "Standalone_FrodoKEM_640_AES", wp } },
+        { 5, { cfg, "Standalone_HQC_128", wp } },
+        { 6, { cfg, "Standalone_ClassicMcEliece_348864", wp } },
+        { 7, { cfg, "Standalone_X25519", wp } },
+        { 8, { cfg, "Hybrid_ClassicMcEliece_348864_Ascon128a", wp } },
+        { 9, { cfg, "Hybrid_FrodoKEM_640_AES_Ascon128a", wp } },
+        { 10, { cfg, "Hybrid_HQC_128_Ascon128a", wp } },
     };
 
-    for (int i = 0; i < 4; i++) pthread_create(&th[i], NULL, ent_thread_main, &args[i]);
-    for (int i = 0; i < 4; i++) pthread_join(th[i], NULL);
+    pthread_t th[10];
+    int th_count = 0;
+    int create_failed = 0;
+    int model_count = (int)(sizeof(models) / sizeof(models[0]));
+    for (int i = 0; i < model_count; i++) {
+        if (cfg->model_id != 0 && cfg->model_id != models[i].id) continue;
+        if (pthread_create(&th[th_count], NULL, ent_thread_main, &models[i].arg) != 0) {
+            create_failed = 1;
+            continue;
+        }
+        th_count++;
+    }
+    for (int i = 0; i < th_count; i++) pthread_join(th[i], NULL);
 
-    ent_close(&w);
-    return 0;
+    if (!cfg->no_csv) ent_close(&w);
+    return create_failed ? -1 : 0;
 }

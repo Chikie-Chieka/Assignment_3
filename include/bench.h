@@ -14,6 +14,8 @@ typedef struct {
     int ent_iterations;
     bool skip_latency;
     bool skip_ent;
+    bool no_csv;
+    int model_id;            // 0 = all, 1..4 = specific model
 
     // Derived
     uint8_t *payload;

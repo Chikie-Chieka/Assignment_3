@@ -10,7 +10,7 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
 
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
-        strncpy(r.Model, "ModelD_Ascon80pq", sizeof(r.Model)-1);
+        strncpy(r.Model, "Standalone_Ascon_80pq", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
 
         r.Failed = 0;

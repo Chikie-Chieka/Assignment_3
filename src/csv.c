@@ -10,6 +10,7 @@ int csv_open(csv_writer_t *w, const char *path) {
 }
 
 void csv_write_header(csv_writer_t *w) {
+    if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp,
         "Model,Iteration,KeyGen_ns,Encaps_ns,Decaps_ns,KDF_ns,"
@@ -19,6 +20,7 @@ void csv_write_header(csv_writer_t *w) {
 }
 
 void csv_write_row(csv_writer_t *w, const csv_row_t *r) {
+    if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp,
         "%s,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%.9f,%d,%ld\n",

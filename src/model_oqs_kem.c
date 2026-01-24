@@ -129,9 +129,89 @@ out:
     OQS_KEM_free(kem);
 }
 
+static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
+                             const bench_config_t *cfg, csv_writer_t *csv) {
+
+    OQS_KEM *kem = OQS_KEM_new(kem_alg);
+    if (!kem) return;
+
+    uint8_t *pk = malloc(kem->length_public_key);
+    uint8_t *sk = malloc(kem->length_secret_key);
+    uint8_t *ct = malloc(kem->length_ciphertext);
+    uint8_t *ss_e = malloc(kem->length_shared_secret);
+    uint8_t *ss_d = malloc(kem->length_shared_secret);
+    if (!pk || !sk || !ct || !ss_e || !ss_d) goto out;
+
+    int total = cfg->warmup + cfg->iterations;
+
+    // 1. Measure KeyGen once, outside the loop (matches Python)
+    uint64_t t_kg0 = now_ns_monotonic_raw();
+    int kg_rc = OQS_KEM_keypair(kem, pk, sk);
+    uint64_t t_kg1 = now_ns_monotonic_raw();
+    uint64_t keygen_ns = t_kg1 - t_kg0;
+
+    for (int i = 0; i < total; i++) {
+        csv_row_t r; memset(&r, 0, sizeof(r));
+        strncpy(r.Model, model_name, sizeof(r.Model)-1);
+        r.Iteration = (i - cfg->warmup) + 1;
+        r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
+        r.KeyGen_ns = keygen_ns;
+
+        uint64_t t1 = now_ns_monotonic_raw();
+        if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
+        uint64_t t2 = now_ns_monotonic_raw();
+        if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
+        uint64_t t3 = now_ns_monotonic_raw();
+
+        r.Encaps_ns = t2 - t1;
+        r.Decaps_ns = t3 - t2;
+
+        if (!r.Failed && memcmp(ss_e, ss_d, kem->length_shared_secret) != 0) r.Failed = 1;
+
+        r.Total_ns = r.Encaps_ns + r.Decaps_ns;
+        r.Total_s = (double)r.Total_ns / 1e9;
+        r.Peak_Alloc_KB = peak_rss_kb();
+
+        if (i >= cfg->warmup) csv_write_row(csv, &r);
+    }
+
+out:
+    if (pk) free(pk);
+    if (sk) free(sk);
+    if (ct) free(ct);
+    if (ss_e) free(ss_e);
+    if (ss_d) free(ss_d);
+    OQS_KEM_free(kem);
+}
+
 void run_kyber512_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_dem("ModelA_Kyber512", OQS_KEM_alg_kyber_512, cfg, csv);
 }
 void run_bike_l1_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_dem("ModelC_BIKE_L1", OQS_KEM_alg_bike_l1, cfg, csv);
+}
+
+void run_standalone_bike_l1(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_only("Standalone_BIKE_L1", OQS_KEM_alg_bike_l1, cfg, csv);
+}
+void run_standalone_kyber512(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_only("Standalone_Kyber512", OQS_KEM_alg_kyber_512, cfg, csv);
+}
+void run_standalone_frodokem_640_aes(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_only("Standalone_FrodoKEM_640_AES", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
+}
+void run_standalone_hqc_128(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_only("Standalone_HQC_128", OQS_KEM_alg_hqc_128, cfg, csv);
+}
+void run_standalone_classic_mceliece_348864(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_only("Standalone_ClassicMcEliece_348864", OQS_KEM_alg_classic_mceliece_348864, cfg, csv);
+}
+void run_hybrid_classic_mceliece_348864_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_dem("Hybrid_ClassicMcEliece_348864_Ascon128a", OQS_KEM_alg_classic_mceliece_348864, cfg, csv);
+}
+void run_hybrid_frodokem_640_aes_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_dem("Hybrid_FrodoKEM_640_AES_Ascon128a", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
+}
+void run_hybrid_hqc_128_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_dem("Hybrid_HQC_128_Ascon128a", OQS_KEM_alg_hqc_128, cfg, csv);
 }

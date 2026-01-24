@@ -56,4 +56,33 @@ To quantify performance and security robustness, all models were subjected to a 
 
 ## 4. How to run
 
-To measure memory usage, use Valgrind or similar external tool for byte-precise memory measurement, the current implementation of the program measure memory by page, which is too big to measure changes of 4096 bytes payloads.
+make clean && make
+./build_c
+
+Applicable parameters/arguments:
+  -h, --help            show this help message and exit
+  --iterations ITERATIONS
+                        (default: 100)
+  --payload-bytes PAYLOAD_BYTES
+                        (default: 4096)
+  --aad AAD             (default: )
+  --seed SEED           (default: 1337)
+  --ent-iterations ENT_ITERATIONS
+                        (default: 50)
+  --ent-payload-mb ENT_PAYLOAD_MB
+                        ENT test payload size in MB (default: 1)
+  --skip-latency        Skip latency/memory benchmarking phase (testing_process.csv + results.json)
+  --skip-ent            Skip ENT randomness testing phase (ENT_Test.csv)
+  --no-csv, --output none
+                        Disable all CSV output files
+  --model N             Run exactly one model:
+                        1=Standalone_Ascon_80pq
+                        2=Standalone_BIKE_L1
+                        3=Standalone_Kyber512
+                        4=Standalone_FrodoKEM_640_AES
+                        5=Standalone_HQC_128
+                        6=Standalone_ClassicMcEliece_348864
+                        7=Standalone_X25519
+                        8=Hybrid_ClassicMcEliece_348864_Ascon128a
+                        9=Hybrid_FrodoKEM_640_AES_Ascon128a
+                        10=Hybrid_HQC_128_Ascon128a

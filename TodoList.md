@@ -4,16 +4,18 @@ TODO - DEADLINE 31/1:
         - Also find more research on Ascon hybrids where applicable.
     HIGH PRIORITY:
         - DONE ~~Migrate to C for faster speed~~
-        - Add these models:
-            + Standalone:
-                1. BIKE
-                2. Classic McEliece
-                3. FrodoKEM
-                4. HQC
-            + Hybrid
-                1. Classic McEliece + Ascon-128a
-                2. FrodoKEM + Ascon-128a
-                3. HQC + Ascon-128a
+        - DONE ~~Add these models:~~
+            ~~+ Standalone:~~
+                ~~1. BIKE-L1~~
+                ~~2. Classic McEliece~~
+                ~~3. FrodoKEM~~
+                ~~4. HQC~~
+                ~~5. Kyber-512~~
+                ~~6. X25519~~
+            ~~+ Hybrid~~
+                ~~1. Classic McEliece + Ascon-128a~~
+                ~~2. FrodoKEM + Ascon-128a~~
+                ~~3. HQC + Ascon-128a~~
         - Create environment to limit CPU cores and RAM
     MEDIUM PRIORITY:
         - Add monitor to track CPU % and have better Memory track (for each iterations instead of accrueing peak RAM)
@@ -54,4 +56,3 @@ For your experiments:
 
 To Compare KEMs (Kyber vs. BIKE vs. X25519): Keep AAD constant (e.g., 0 or 16 bytes) across all runs. Varying it would introduce noise that obscures the KEM differences.
 To Compare Baseline vs. Hybrid: Be aware that Ascon-80pq is slower at processing AAD. A non-zero AAD is fairer to the Hybrids because it highlights the efficiency of Ascon-128a.
-

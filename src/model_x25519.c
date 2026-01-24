@@ -146,3 +146,47 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     free(c);
     free(m);
 }
+
+void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
+    int total = cfg->warmup + cfg->iterations;
+
+    // 1. Measure KeyGen once, outside the loop
+    uint64_t t_kg0 = now_ns_monotonic_raw();
+    EVP_PKEY *srv = NULL, *cli = NULL;
+    int kg_ok = 1;
+    if (!x25519_keypair(&srv) || !x25519_keypair(&cli)) kg_ok = 0;
+    uint64_t t_kg1 = now_ns_monotonic_raw();
+    uint64_t keygen_ns = t_kg1 - t_kg0;
+
+    for (int i = 0; i < total; i++) {
+        csv_row_t r; memset(&r, 0, sizeof(r));
+        strncpy(r.Model, "Standalone_X25519", sizeof(r.Model)-1);
+        r.Iteration = (i - cfg->warmup) + 1;
+        r.Failed = !kg_ok;
+        r.KeyGen_ns = keygen_ns;
+
+        uint64_t t1 = now_ns_monotonic_raw();
+
+        uint8_t ss_cli[64], ss_srv[64];
+        size_t ss_cli_len = 0, ss_srv_len = 0;
+
+        if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
+        uint64_t t2 = now_ns_monotonic_raw();
+        if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
+        uint64_t t3 = now_ns_monotonic_raw();
+
+        r.Encaps_ns = t2 - t1;
+        r.Decaps_ns = t3 - t2;
+
+        if (!r.Failed && (ss_cli_len != ss_srv_len || memcmp(ss_cli, ss_srv, ss_cli_len) != 0)) r.Failed = 1;
+
+        r.Total_ns = r.Encaps_ns + r.Decaps_ns;
+        r.Total_s = (double)r.Total_ns / 1e9;
+        r.Peak_Alloc_KB = peak_rss_kb();
+
+        if (i >= cfg->warmup) csv_write_row(csv, &r);
+    }
+
+    EVP_PKEY_free(srv);
+    EVP_PKEY_free(cli);
+}
