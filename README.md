@@ -56,9 +56,12 @@ To quantify performance and security robustness, all models were subjected to a 
 
 ## 4. How to run
 
+```
 make clean && make
 ./build_c
+```
 
+```
 Applicable parameters/arguments:
   -h, --help            show this help message and exit
   --iterations ITERATIONS
@@ -86,3 +89,4 @@ Applicable parameters/arguments:
                         8=Hybrid_ClassicMcEliece_348864_Ascon128a
                         9=Hybrid_FrodoKEM_640_AES_Ascon128a
                         10=Hybrid_HQC_128_Ascon128a
+```
