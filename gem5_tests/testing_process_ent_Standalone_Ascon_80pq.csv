@@ -1,0 +1,3 @@
+Model,Iteration,Entropy_Bytes,Entropy_Bits_Per_Byte,Serial_Correlation_Coefficient,Status
+Standalone_Ascon_80pq,1,1048576,7.999818293993,-0.000544770704,success
+Standalone_Ascon_80pq,2,1048576,7.999832449122,0.000203579131,success
