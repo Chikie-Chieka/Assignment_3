@@ -1,0 +1,6 @@
+Model,Iteration,KeyGen_ns,Encaps_ns,Decaps_ns,KDF_ns,Encryption_ns,Decryption_ns,Total_ns,Total_s,Cpu_Pct,Failed,Peak_Alloc_KB,Peak_RSS_KB
+Standalone_Ascon_80pq,1,0,0,0,0,129418,129324,258742,0.000258742,99.99,0,0,0
+Standalone_Ascon_80pq,2,0,0,0,0,129610,129348,258958,0.000258958,99.98,0,0,0
+Standalone_Ascon_80pq,3,0,0,0,0,129610,129348,258958,0.000258958,99.98,0,0,0
+Standalone_Ascon_80pq,4,0,0,0,0,129610,129348,258958,0.000258958,99.98,0,0,0
+Standalone_Ascon_80pq,5,0,0,0,0,129610,129348,258958,0.000258958,99.98,0,0,0

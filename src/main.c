@@ -84,7 +84,7 @@ static void bench_print_help(const char *prog) {
 void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
     // Defaults matching experiment_final.py
     cfg->iterations = 100;
-    cfg->warmup = 100;
+    cfg->warmup = 1;
     cfg->payload_bytes = 4096;
     cfg->aad = "";
     cfg->seed = 1337;
