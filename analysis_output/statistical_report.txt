@@ -1,0 +1,354 @@
+====================================================================================================
+STATISTICAL ANALYSIS REPORT - PQC BENCHMARKING
+====================================================================================================
+
+METRICS RECORDED AND UNITS
+--------------------------------------------------
+Performance metrics (time): KeyGen_ns, Encaps_ns, Decaps_ns, KDF_ns,
+  Encryption_ns, Decryption_ns, Total_ns (nanoseconds; summaries also shown in microseconds).
+Resource metrics: Peak_Alloc_KB (kilobytes), Peak_RSS_KB (kilobytes, IoT only),
+  Cpu_Pct (percent, IoT only).
+Entropy metrics: Entropy_Bits_Per_Byte (ideal 8.0), Serial_Correlation_Coefficient (ideal 0.0).
+Comparisons in tables: base machine and IoT simulation compare models within each environment.
+
+====================================================================================================
+1. BASE MACHINE STATISTICS
+====================================================================================================
+
+  1.1 TOTAL EXECUTION TIME (Total_ns)
+  --------------------------------------------------
+                                         count          mean          std      min         q25     median         q75      max       cv        iqr      ci_95
+Model                                                                                                                                                        
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000    123958.421   24634.3713    84816   103467.50   119752.5   138882.75   228550  19.8731   35415.25   482.8337
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  1231126.6089  102651.0167  1044155  1168327.00  1207302.5  1267734.50  2027902   8.3380   99407.50  2011.9599
+Standalone_Ascon_80pq                    10000    38256.3409    6494.9100    30071    33589.00    34912.5    42969.50    85107  16.9773    9380.50   127.3002
+Standalone_BIKE_L1                       10000   866097.3973  100666.5567   689403   796175.75   825663.5   929944.75  1635989  11.6230  133769.00  1973.0645
+Standalone_ClassicMcEliece_348864        10000    77580.4375   15992.0805    51444    63968.50    74460.0    85905.25   265632  20.6135   21936.75   313.4448
+Standalone_FrodoKEM_640_AES              10000  1193247.4292  127789.8622   955931  1128292.25  1167305.0  1240212.50  2025556  10.7094  111920.25  2504.6813
+Standalone_Kyber512                      10000    28628.9977    5538.8267    19275    25791.75    29438.5    31855.25    86837  19.3469    6063.50   108.5610
+Standalone_X25519                        10000    91924.3676   16451.7474    63767    75646.00    91293.0   105340.50   152803  17.8970   29694.50   322.4542
+
+  1.2 KEYGEN (KeyGen_ns)
+  --------------------------------------------------
+                                         count        mean  std       min      median       max   cv
+Model                                                                                               
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  67441618.0  0.0  67441618  67441618.0  67441618  0.0
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000    996200.0  0.0    996200    996200.0    996200  0.0
+Standalone_Ascon_80pq                    10000         0.0  0.0         0         0.0         0  0.0
+Standalone_BIKE_L1                       10000    972384.0  0.0    972384    972384.0    972384  0.0
+Standalone_ClassicMcEliece_348864        10000  35434867.0  0.0  35434867  35434867.0  35434867  0.0
+Standalone_FrodoKEM_640_AES              10000    764208.0  0.0    764208    764208.0    764208  0.0
+Standalone_Kyber512                      10000    614144.0  0.0    614144    614144.0    614144  0.0
+Standalone_X25519                        10000   1036069.0  0.0   1036069   1036069.0   1036069  0.0
+
+  1.3 ENCAPS (Encaps_ns)
+  --------------------------------------------------
+                                         count         mean         std     min    median      max       cv
+Model                                                                                                      
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000   25208.7004   7632.1371   14919   23568.0    78143  30.2758
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000   614418.483  54755.3737  505164  600592.0  1042647   8.9117
+Standalone_Ascon_80pq                    10000          0.0      0.0000       0       0.0        0   0.0000
+Standalone_BIKE_L1                       10000   56160.6586  11073.3110   37571   54235.5   104644  19.7172
+Standalone_ClassicMcEliece_348864        10000   22777.6472   6650.9655   13441   21274.5    70341  29.1995
+Standalone_FrodoKEM_640_AES              10000  614015.1164  68467.0891  491084  598841.0  1047203  11.1507
+Standalone_Kyber512                      10000   17513.7387   3897.1118   11419   18337.5    71577  22.2517
+Standalone_X25519                        10000   46883.6474   9234.7894   31828   46054.0    89262  19.6973
+
+  1.4 DECAPS (Decaps_ns)
+  --------------------------------------------------
+                                         count         mean         std     min    median      max       cv
+Model                                                                                                      
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000   56338.5447  11902.9047   38275   54132.0   114486  21.1275
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  575390.9563  52716.4579  489027  560073.5   969846   9.1619
+Standalone_Ascon_80pq                    10000          0.0      0.0000       0       0.0        0   0.0000
+Standalone_BIKE_L1                       10000  809936.7387  97844.7872  651144  766061.0  1552823  12.0805
+Standalone_ClassicMcEliece_348864        10000   54802.7903  11499.9934   37911   53299.0   235306  20.9843
+Standalone_FrodoKEM_640_AES              10000  579232.3128  67335.4799  464190  565072.5  1011285  11.6250
+Standalone_Kyber512                      10000    11115.259   2501.5329    7366   10594.5    60232  22.5054
+Standalone_X25519                        10000   45040.7202   8088.7253   31939   44028.0    89416  17.9587
+
+  1.5 KDF (KDF_ns)
+  --------------------------------------------------
+                                         count        mean        std   min   median    max       cv
+Model                                                                                               
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  12766.5432  3696.3498  6717  13316.0  39526  28.9534
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  13563.9481  4895.9017  8002  11401.5  49979  36.0950
+Standalone_Ascon_80pq                    10000         0.0     0.0000     0      0.0      0   0.0000
+Standalone_BIKE_L1                       10000         0.0     0.0000     0      0.0      0   0.0000
+Standalone_ClassicMcEliece_348864        10000         0.0     0.0000     0      0.0      0   0.0000
+Standalone_FrodoKEM_640_AES              10000         0.0     0.0000     0      0.0      0   0.0000
+Standalone_Kyber512                      10000         0.0     0.0000     0      0.0      0   0.0000
+Standalone_X25519                        10000         0.0     0.0000     0      0.0      0   0.0000
+
+  1.6 ENCRYPTION (Encryption_ns)
+  --------------------------------------------------
+                                         count        mean        std    min   median    max       cv
+Model                                                                                                
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  15118.0201  3760.5613  11142  13571.0  51926  24.8747
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  14007.6498  2416.3957  11659  13216.0  41860  17.2505
+Standalone_Ascon_80pq                    10000   19349.518  3711.1816  14982  17325.5  52113  19.1797
+Standalone_BIKE_L1                       10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_ClassicMcEliece_348864        10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_FrodoKEM_640_AES              10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_Kyber512                      10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_X25519                        10000         0.0     0.0000      0      0.0      0   0.0000
+
+  1.7 DECRYPTION (Decryption_ns)
+  --------------------------------------------------
+                                         count        mean        std    min   median    max       cv
+Model                                                                                                
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  14526.6126  3133.0358  10986  13419.0  42219  21.5676
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  13745.5717  2346.0249  11305  13020.0  42865  17.0675
+Standalone_Ascon_80pq                    10000  18906.8229  3240.1564  15026  17315.5  60829  17.1375
+Standalone_BIKE_L1                       10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_ClassicMcEliece_348864        10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_FrodoKEM_640_AES              10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_Kyber512                      10000         0.0     0.0000      0      0.0      0   0.0000
+Standalone_X25519                        10000         0.0     0.0000      0      0.0      0   0.0000
+
+  1.8 PEAK MEMORY ALLOCATION (Peak_Alloc_KB)
+  --------------------------------------------------
+                                         count    mean  std   min  median   max   cv
+Model                                                                               
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  7396.0  0.0  7396  7396.0  7396  0.0
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  6692.0  0.0  6692  6692.0  6692  0.0
+Standalone_Ascon_80pq                    10000  5544.0  0.0  5544  5544.0  5544  0.0
+Standalone_BIKE_L1                       10000  6440.0  0.0  6440  6440.0  6440  0.0
+Standalone_ClassicMcEliece_348864        10000  7080.0  0.0  7080  7080.0  7080  0.0
+Standalone_FrodoKEM_640_AES              10000  6568.0  0.0  6568  6568.0  6568  0.0
+Standalone_Kyber512                      10000  6312.0  0.0  6312  6312.0  6312  0.0
+Standalone_X25519                        10000  6312.0  0.0  6312  6312.0  6312  0.0
+
+====================================================================================================
+2. IoT SIMULATION STATISTICS
+====================================================================================================
+
+  2.1 TOTAL EXECUTION TIME (Total_ns)
+  --------------------------------------------------
+                                         count            mean          std      min         q25     median         q75      max       cv        iqr      ci_95
+Model                                                                                                                                                          
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000   654216.954967  105007.1147   472426   584291.50   632060.5   682390.50  1316584  16.0508   98099.00  1188.2674
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000  1937016.728933  254301.5455  1455737  1773015.00  1886305.5  2018122.25  3517284  13.1285  245107.25  2877.6929
+Standalone_Ascon_80pq                    24548   700654.998126  105094.7513   528854   625219.50   680642.5   745315.75  2947404  14.9995  120096.25  1314.7072
+Standalone_BIKE_L1                       30000  1146805.515367  267679.6692   766458   953901.75  1067702.5  1201109.50  2090178  23.3413  247207.75  3029.0806
+Standalone_ClassicMcEliece_348864        30000   120952.184533   26408.8912    77564   102212.00   113854.5   134145.75   384293  21.8342   31933.75   298.8447
+Standalone_FrodoKEM_640_AES              30000    1380632.8727  196828.4495  1087721  1260819.00  1325546.5  1429326.50  2539480  14.2564  168507.50  2227.3236
+Standalone_Kyber512                      30000      65177.1084   14652.0724    35406    53571.00    65302.0    75829.00   288733  22.4804   22258.00   165.8038
+Standalone_X25519                        30000   140517.811167   29378.1343    84779   118840.75   135792.5   160059.50   420383  20.9071   41218.75   332.4449
+
+  2.2 KEYGEN (KeyGen_ns)
+  --------------------------------------------------
+                                         count             mean           std       min      median       max       cv
+Model                                                                                                                 
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000  49505570.333333  1.157762e+06  47868278  50321625.0  50326808   2.3386
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000        1279349.0  7.305440e+04   1177058   1317942.0   1343047   5.7103
+Standalone_Ascon_80pq                    24548              0.0  0.000000e+00         0         0.0         0   0.0000
+Standalone_BIKE_L1                       30000    967728.666667  1.536500e+05    847927    870636.0   1184623  15.8774
+Standalone_ClassicMcEliece_348864        30000  56547851.666667  6.877296e+06  47050279  59482659.0  63110617  12.1619
+Standalone_FrodoKEM_640_AES              30000   1190291.666667  1.917279e+05   1026691   1084839.0   1459345  16.1076
+Standalone_Kyber512                      30000         523994.0  8.421034e+04    437256    496694.0    638032  16.0709
+Standalone_X25519                        30000    749526.333333  9.205653e+04    665079    705944.0    877556  12.2820
+
+  2.3 ENCAPS (Encaps_ns)
+  --------------------------------------------------
+                                         count           mean          std     min    median      max       cv
+Model                                                                                                         
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000   37114.684433   13382.6239   17908   33994.0   235967  36.0575
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000    710130.0272   97107.3268  519659  678278.0  1396757  13.6746
+Standalone_Ascon_80pq                    24548            0.0       0.0000       0       0.0        0   0.0000
+Standalone_BIKE_L1                       30000   69951.874133   16854.0892   43586   67683.0   330073  24.0938
+Standalone_ClassicMcEliece_348864        30000     29425.2076    9916.4537   15647   27778.5   253231  33.7005
+Standalone_FrodoKEM_640_AES              30000  694656.249233  103826.2495  531766  662108.0  1361747  14.9464
+Standalone_Kyber512                      30000   22004.327233    6591.4274   11202   22877.5   232444  29.9551
+Standalone_X25519                        30000   57539.005833   13433.8005   34071   56097.0   289369  23.3473
+
+  2.4 DECAPS (Decaps_ns)
+  --------------------------------------------------
+                                         count            mean          std     min    median      max       cv
+Model                                                                                                          
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000    96338.622933   21195.7783   63460   89284.5   342079  22.0013
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000     697090.0199   99268.9443  505094  660887.5  1399996  14.2405
+Standalone_Ascon_80pq                    24548             0.0       0.0000       0       0.0        0   0.0000
+Standalone_BIKE_L1                       30000  1076853.641233  258387.0459  719931  998287.5  2004280  23.9946
+Standalone_ClassicMcEliece_348864        30000    91526.976933   20411.7414   61917   85121.0   336758  22.3013
+Standalone_FrodoKEM_640_AES              30000   685976.623467  105699.2284  533390  647992.0  1379823  15.4086
+Standalone_Kyber512                      30000    43172.781167   10418.0808   24204   42800.5   265187  24.1311
+Standalone_X25519                        30000    82978.805333   18482.2307   50708   79107.5   325325  22.2734
+
+  2.5 KDF (KDF_ns)
+  --------------------------------------------------
+                                         count          mean        std    min   median     max       cv
+Model                                                                                                   
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000  18649.129167  7284.9188  10009  17500.0  199284  39.0631
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000    23748.4552  9868.2670  11277  21855.5  238094  41.5533
+Standalone_Ascon_80pq                    24548           0.0     0.0000      0      0.0       0   0.0000
+Standalone_BIKE_L1                       30000           0.0     0.0000      0      0.0       0   0.0000
+Standalone_ClassicMcEliece_348864        30000           0.0     0.0000      0      0.0       0   0.0000
+Standalone_FrodoKEM_640_AES              30000           0.0     0.0000      0      0.0       0   0.0000
+Standalone_Kyber512                      30000           0.0     0.0000      0      0.0       0   0.0000
+Standalone_X25519                        30000           0.0     0.0000      0      0.0       0   0.0000
+
+  2.6 ENCRYPTION (Encryption_ns)
+  --------------------------------------------------
+                                         count           mean         std     min    median      max       cv
+Model                                                                                                        
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000    252021.2117  44937.4956  188350  233949.0   628560  17.8308
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000    253894.8738  47001.5123  180401  234455.5   679216  18.5122
+Standalone_Ascon_80pq                    24548  353872.995397  57687.7254  264571  341886.5  2488461  16.3018
+Standalone_BIKE_L1                       30000            0.0      0.0000       0       0.0        0   0.0000
+Standalone_ClassicMcEliece_348864        30000            0.0      0.0000       0       0.0        0   0.0000
+Standalone_FrodoKEM_640_AES              30000            0.0      0.0000       0       0.0        0   0.0000
+Standalone_Kyber512                      30000            0.0      0.0000       0       0.0        0   0.0000
+Standalone_X25519                        30000            0.0      0.0000       0       0.0        0   0.0000
+
+  2.7 DECRYPTION (Decryption_ns)
+  --------------------------------------------------
+                                         count           mean         std     min    median     max       cv
+Model                                                                                                       
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000  250093.306733  44793.5580  184497  232160.0  603070  17.9107
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000  252153.352833  47258.8235  187306  232561.5  654540  18.7421
+Standalone_Ascon_80pq                    24548  346782.002729  58816.3957  258543  329324.0  784646  16.9606
+Standalone_BIKE_L1                       30000            0.0      0.0000       0       0.0       0   0.0000
+Standalone_ClassicMcEliece_348864        30000            0.0      0.0000       0       0.0       0   0.0000
+Standalone_FrodoKEM_640_AES              30000            0.0      0.0000       0       0.0       0   0.0000
+Standalone_Kyber512                      30000            0.0      0.0000       0       0.0       0   0.0000
+Standalone_X25519                        30000            0.0      0.0000       0       0.0       0   0.0000
+
+  2.8 PEAK MEMORY ALLOCATION (Peak_Alloc_KB)
+  --------------------------------------------------
+                                         count         mean        std   min   median    max       cv
+Model                                                                                                
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000       7528.0     0.0000  7528   7528.0   7528   0.0000
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000       6956.0     0.0000  6956   6956.0   6956   0.0000
+Standalone_Ascon_80pq                    24548  6086.370539     1.9654  6084   6088.0   6088   0.0323
+Standalone_BIKE_L1                       30000      17732.0  7982.2490  6444  23292.0  23460  45.0161
+Standalone_ClassicMcEliece_348864        30000       7212.0     0.0000  7212   7212.0   7212   0.0000
+Standalone_FrodoKEM_640_AES              30000       6568.0     5.6569  6560   6572.0   6572   0.0861
+Standalone_Kyber512                      30000  6421.333333    29.2732  6380   6440.0   6444   0.4559
+Standalone_X25519                        30000  6442.666667     1.8856  6440   6444.0   6444   0.0293
+
+  2.9 PEAK RSS MEMORY (Peak_RSS_KB)
+  --------------------------------------------------
+                                         count         mean     std   min  median   max      cv
+Model                                                                                          
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000       7640.0  0.0000  7640  7640.0  7640  0.0000
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000  7009.333333  1.8856  7008  7008.0  7012  0.0269
+Standalone_Ascon_80pq                    24548  5859.258921  1.5541  5856  5860.0  5860  0.0265
+Standalone_BIKE_L1                       30000       6508.0  0.0000  6508  6508.0  6508  0.0000
+Standalone_ClassicMcEliece_348864        30000       7296.0  0.0000  7296  7296.0  7296  0.0000
+Standalone_FrodoKEM_640_AES              30000  6662.666667  7.5426  6652  6668.0  6668  0.1132
+Standalone_Kyber512                      30000       6600.0  3.2660  6596  6600.0  6604  0.0495
+Standalone_X25519                        30000  6521.333333  3.7713  6516  6524.0  6524  0.0578
+
+  2.10 CPU UTILIZATION (Cpu_Pct)
+  --------------------------------------------------
+                                         count       mean      std    min median    max       cv
+Model                                                                                           
+Hybrid_ClassicMcEliece_348864_Ascon128a  30000  57.584962  30.5916  24.04  49.62  99.84  53.1243
+Hybrid_FrodoKEM_640_AES_Ascon128a        30000  57.408386  30.4819  21.99  49.71  99.78  53.0965
+Standalone_Ascon_80pq                    24548   64.66158  29.3812  23.57   49.7  99.85  45.4384
+Standalone_BIKE_L1                       30000  57.401735  30.6127  19.78  49.69  99.88  53.3307
+Standalone_ClassicMcEliece_348864        30000  57.067266  30.5312  17.76  49.51  99.39  53.5003
+Standalone_FrodoKEM_640_AES              30000  57.469969  30.6686  19.72  49.69  99.72  53.3645
+Standalone_Kyber512                      30000  56.730348  30.2631   4.48  49.26  99.05  53.3455
+Standalone_X25519                        30000  57.217785  30.5212  16.96  49.58   99.4  53.3421
+
+====================================================================================================
+3. ENTROPY TEST STATISTICS
+====================================================================================================
+
+  3.1 ENTROPY BITS PER BYTE (Entropy_Bits_Per_Byte)
+  --------------------------------------------------
+  Ideal value: 8.0 bits/byte (maximum entropy)
+                                         count  mean  std  min  q25  median  q75  max   cv  iqr  ci_95
+Model                                                                                                 
+Hybrid_ClassicMcEliece_348864_Ascon128a     10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Hybrid_FrodoKEM_640_AES_Ascon128a           10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Hybrid_HQC_128_Ascon128a                    10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_Ascon_80pq                       10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_BIKE_L1                          10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_ClassicMcEliece_348864           10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_FrodoKEM_640_AES                 10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_HQC_128                          10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_Kyber512                         10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+Standalone_X25519                           10   8.0  0.0  8.0  8.0     8.0  8.0  8.0  0.0  0.0    0.0
+
+  3.2 SERIAL CORRELATION COEFFICIENT (Serial_Correlation_Coefficient)
+  --------------------------------------------------
+  Ideal value: 0.0 (no correlation between consecutive bytes)
+                                         count    mean     std     min  median     max        cv
+Model                                                                                           
+Hybrid_ClassicMcEliece_348864_Ascon128a     10 -0.0001  0.0004 -0.0008 -0.0000  0.0008 -477.1673
+Hybrid_FrodoKEM_640_AES_Ascon128a           10 -0.0001  0.0004 -0.0008 -0.0000  0.0008 -477.1673
+Hybrid_HQC_128_Ascon128a                    10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_Ascon_80pq                       10 -0.0000  0.0003 -0.0005  0.0000  0.0003 -918.0162
+Standalone_BIKE_L1                          10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_ClassicMcEliece_348864           10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_FrodoKEM_640_AES                 10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_HQC_128                          10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_Kyber512                         10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+Standalone_X25519                           10 -0.0001  0.0003 -0.0005 -0.0001  0.0003 -354.6157
+
+====================================================================================================
+4. STATISTICAL HYPOTHESIS TESTS
+====================================================================================================
+
+  4.1 KRUSKAL-WALLIS H-TEST (Non-parametric ANOVA)
+  --------------------------------------------------
+  H-statistic: 75881.2155
+  p-value: 0.00e+00
+  Significant difference: Yes
+  Interpretation: Tests whether all models have the same median execution time.
+
+  4.2 PAIRWISE MANN-WHITNEY U TESTS (Top 10 significant)
+  --------------------------------------------------
+  Bonferroni-corrected p-values for multiple comparisons.
+                                model_1                           model_2  u_statistic  p_value  corrected_p  significant
+Hybrid_ClassicMcEliece_348864_Ascon128a Hybrid_FrodoKEM_640_AES_Ascon128a          0.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a             Standalone_Ascon_80pq   99999996.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a                Standalone_BIKE_L1          0.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a Standalone_ClassicMcEliece_348864   95808686.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a       Standalone_FrodoKEM_640_AES          0.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a               Standalone_Kyber512   99999994.0      0.0          0.0         True
+Hybrid_ClassicMcEliece_348864_Ascon128a                 Standalone_X25519   85798127.0      0.0          0.0         True
+      Hybrid_FrodoKEM_640_AES_Ascon128a             Standalone_Ascon_80pq  100000000.0      0.0          0.0         True
+      Hybrid_FrodoKEM_640_AES_Ascon128a                Standalone_BIKE_L1   99406954.5      0.0          0.0         True
+      Hybrid_FrodoKEM_640_AES_Ascon128a Standalone_ClassicMcEliece_348864  100000000.0      0.0          0.0         True
+
+====================================================================================================
+5. COMPARATIVE ANALYSIS (Base Machine vs IoT Simulation)
+====================================================================================================
+
+Base machine results (Total_ns):
+Fastest mean: Standalone_Kyber512 at 28.63 us
+Slowest mean: Hybrid_FrodoKEM_640_AES_Ascon128a at 1,231.13 us
+Mean range: 1,202.50 us
+  Highest variability: Standalone_ClassicMcEliece_348864 at 20.61 percent CV
+
+IoT simulation results (Total_ns):
+Fastest mean: Standalone_Kyber512 at 65.18 us
+Slowest mean: Hybrid_FrodoKEM_640_AES_Ascon128a at 1,937.02 us
+Mean range: 1,871.84 us
+  Highest variability: Standalone_BIKE_L1 at 23.34 percent CV
+
+IoT vs Base Machine Performance Ratio (common models):
+--------------------------------------------------
+  Median ratio: 1.57x slower on IoT
+  Min ratio: 1.16x
+  Max ratio: 18.31x
+
+Per-Model IoT/Base Ratio:
+                                        Base_Mean_us  IoT_Mean_us      Ratio
+Model                                                                       
+Standalone_FrodoKEM_640_AES              1193.247429  1380.632873   1.157038
+Standalone_BIKE_L1                        866.097397  1146.805515   1.324107
+Standalone_X25519                          91.924368   140.517811   1.528624
+Standalone_ClassicMcEliece_348864          77.580438   120.952185   1.559055
+Hybrid_FrodoKEM_640_AES_Ascon128a        1231.126609  1937.016729   1.573369
+Standalone_Kyber512                        28.628998    65.177108   2.276612
+Hybrid_ClassicMcEliece_348864_Ascon128a   123.958421   654.216955   5.277713
+Standalone_Ascon_80pq                      38.256341   700.654998  18.314742
+
+====================================================================================================
+END OF REPORT
+====================================================================================================
