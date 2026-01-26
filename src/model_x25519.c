@@ -73,7 +73,7 @@ out:
     return ret;
 }
 
-void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
 
     size_t ccap = cfg->payload_len + 16;
@@ -92,7 +92,7 @@ void run_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
-        strncpy(r.Model, "ModelB_X25519", sizeof(r.Model)-1);
+        strncpy(r.Model, "Hybrid_X25519_Ascon128a", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;

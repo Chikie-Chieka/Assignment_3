@@ -196,9 +196,12 @@ int run_ent_phase(const bench_config_t *cfg, const char *ent_path) {
         { 5, { cfg, "Standalone_HQC_128", wp } },
         { 6, { cfg, "Standalone_ClassicMcEliece_348864", wp } },
         { 7, { cfg, "Standalone_X25519", wp } },
-        { 8, { cfg, "Hybrid_ClassicMcEliece_348864_Ascon128a", wp } },
-        { 9, { cfg, "Hybrid_FrodoKEM_640_AES_Ascon128a", wp } },
-        { 10, { cfg, "Hybrid_HQC_128_Ascon128a", wp } },
+        { 8, { cfg, "Hybrid_BIKE_L1_Ascon128a", wp } },
+        { 9, { cfg, "Hybrid_Kyber512_Ascon128a", wp } },
+        { 10, { cfg, "Hybrid_FrodoKEM_640_AES_Ascon128a", wp } },
+        { 11, { cfg, "Hybrid_HQC_128_Ascon128a", wp } },
+        { 12, { cfg, "Hybrid_ClassicMcEliece_348864_Ascon128a", wp } },
+        { 13, { cfg, "Hybrid_X25519_Ascon128a", wp } },
     };
 
     if (cfg->single_thread_mode == SINGLE_THREAD_FULL) {
@@ -211,7 +214,7 @@ int run_ent_phase(const bench_config_t *cfg, const char *ent_path) {
         return 0;
     }
 
-    pthread_t th[10];
+    pthread_t th[13];
     int th_count = 0;
     int create_failed = 0;
     int model_count = (int)(sizeof(models) / sizeof(models[0]));

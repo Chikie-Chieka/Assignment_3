@@ -23,9 +23,12 @@ static const bench_model_entry_t bench_models[] = {
     {5, "Standalone_HQC_128", MODEL_STANDALONE_HQC_128},
     {6, "Standalone_ClassicMcEliece_348864", MODEL_STANDALONE_CLASSIC_MCELIECE_348864},
     {7, "Standalone_X25519", MODEL_STANDALONE_X25519},
-    {8, "Hybrid_ClassicMcEliece_348864_Ascon128a", MODEL_HYBRID_CLASSIC_MCELIECE_348864_ASCON128A},
-    {9, "Hybrid_FrodoKEM_640_AES_Ascon128a", MODEL_HYBRID_FRODOKEM_640_AES_ASCON128A},
-    {10, "Hybrid_HQC_128_Ascon128a", MODEL_HYBRID_HQC_128_ASCON128A},
+    {8, "Hybrid_BIKE_L1_Ascon128a", MODEL_HYBRID_BIKE_L1_ASCON128A},
+    {9, "Hybrid_Kyber512_Ascon128a", MODEL_HYBRID_KYBER512_ASCON128A},
+    {10, "Hybrid_FrodoKEM_640_AES_Ascon128a", MODEL_HYBRID_FRODOKEM_640_AES_ASCON128A},
+    {11, "Hybrid_HQC_128_Ascon128a", MODEL_HYBRID_HQC_128_ASCON128A},
+    {12, "Hybrid_ClassicMcEliece_348864_Ascon128a", MODEL_HYBRID_CLASSIC_MCELIECE_348864_ASCON128A},
+    {13, "Hybrid_X25519_Ascon128a", MODEL_HYBRID_X25519_ASCON128A},
 };
 
 static const char *bench_model_name(int id) {
@@ -70,9 +73,12 @@ static void bench_print_help(const char *prog) {
     printf("                        5=Standalone_HQC_128\n");
     printf("                        6=Standalone_ClassicMcEliece_348864\n");
     printf("                        7=Standalone_X25519\n");
-    printf("                        8=Hybrid_ClassicMcEliece_348864_Ascon128a\n");
-    printf("                        9=Hybrid_FrodoKEM_640_AES_Ascon128a\n");
-    printf("                        10=Hybrid_HQC_128_Ascon128a\n");
+    printf("                        8=Hybrid_BIKE_L1_Ascon128a\n");
+    printf("                        9=Hybrid_Kyber512_Ascon128a\n");
+    printf("                        10=Hybrid_FrodoKEM_640_AES_Ascon128a\n");
+    printf("                        11=Hybrid_HQC_128_Ascon128a\n");
+    printf("                        12=Hybrid_ClassicMcEliece_348864_Ascon128a\n");
+    printf("                        13=Hybrid_X25519_Ascon128a\n");
 }
 
 void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
@@ -142,7 +148,7 @@ void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
                 break;
             case 'm': {
                 int model_id = atoi(optarg);
-                if (model_id < 1 || model_id > 10) {
+                if (model_id < 1 || model_id > 13) {
                     bench_print_help(argv[0]);
                     exit(1);
                 }

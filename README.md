@@ -63,6 +63,13 @@ make clean && make
 
 ```
 Applicable parameters/arguments:
+usage: ./bench_c [-h] [--iterations ITERATIONS] [--payload-bytes PAYLOAD_BYTES]
+          [--aad AAD] [--seed SEED]
+          [--ent-payload-mb ENT_PAYLOAD_MB] [--skip-latency] [--skip-ent]
+          [--ent-iterations ENT_ITERATIONS] [--no-csv | --output none]
+          [--model N]
+
+optional arguments:
   -h, --help            show this help message and exit
   --iterations ITERATIONS
                         (default: 100)
@@ -78,9 +85,10 @@ Applicable parameters/arguments:
   --skip-ent            Skip ENT randomness testing phase (ENT_Test.csv)
   --no-csv, --output none
                         Disable all CSV output files
-  --single-thread {full|partial}
+  --single-thread {none|full|partial}
+                        none: Phase 1 + Phase 2 use worker threads (default)
                         full: no worker threads in Phase 1 or Phase 2
-                        partial: Phase 1 sequential, Phase 2 parallel (default)
+                        partial: Phase 1 sequential, Phase 2 parallel
   --model N             Run exactly one model:
                         1=Standalone_Ascon_80pq
                         2=Standalone_BIKE_L1
@@ -89,7 +97,10 @@ Applicable parameters/arguments:
                         5=Standalone_HQC_128
                         6=Standalone_ClassicMcEliece_348864
                         7=Standalone_X25519
-                        8=Hybrid_ClassicMcEliece_348864_Ascon128a
-                        9=Hybrid_FrodoKEM_640_AES_Ascon128a
-                        10=Hybrid_HQC_128_Ascon128a
+                        8=Hybrid_BIKE_L1_Ascon128a
+                        9=Hybrid_Kyber512_Ascon128a
+                        10=Hybrid_FrodoKEM_640_AES_Ascon128a
+                        11=Hybrid_HQC_128_Ascon128a
+                        12=Hybrid_ClassicMcEliece_348864_Ascon128a
+                        13=Hybrid_X25519_Ascon128a
 ```
