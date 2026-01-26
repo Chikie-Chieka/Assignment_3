@@ -238,13 +238,12 @@ out:
     OQS_KEM_free(kem);
 }
 
-void run_kyber512_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_dem("ModelA_Kyber512", OQS_KEM_alg_kyber_512, cfg, csv);
+void run_hybrid_bike_l1_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_dem("Hybrid_BIKE_L1_Ascon128a", OQS_KEM_alg_bike_l1, cfg, csv);
 }
-void run_bike_l1_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_dem("ModelC_BIKE_L1", OQS_KEM_alg_bike_l1, cfg, csv);
+void run_hybrid_kyber512_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
+    run_oqs_kem_dem("Hybrid_Kyber512_Ascon128a", OQS_KEM_alg_kyber_512, cfg, csv);
 }
-
 void run_standalone_bike_l1(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_only("Standalone_BIKE_L1", OQS_KEM_alg_bike_l1, cfg, csv);
 }
