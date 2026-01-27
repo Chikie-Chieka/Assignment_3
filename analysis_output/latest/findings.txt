@@ -1,0 +1,38 @@
+FINDINGS: 2Core 1GB PQC Benchmarking
+====================================
+
+Scope
+- Native performance and entropy results from saved_output/testing_process_2Core1GB.csv and
+  saved_output/testing_process_ent_2Core1GB.csv.
+- gem5 comparison from gem5_tests/testing_process_*.csv (standalone only).
+
+Key performance findings (native)
+- Strong and widespread timing differences across models: Kruskal-Wallis is significant and
+  54/55 pairwise comparisons are significant (Bonferroni-corrected).
+- Standalone is faster than hybrid overall: standalone mean ~490.9 us vs hybrid mean ~976.7 us,
+  with a significant Mann-Whitney U test.
+- Fastest models (mean execution time, us): Standalone_Kyber512 (~26.8), Standalone_ClassicMcEliece
+  (~85.0), Standalone_X25519 (~102.3).
+- Slowest models (mean execution time, us): Hybrid_FrodoKEM_640_AES_Ascon128a (~1683.7),
+  Hybrid_BIKE_L1_Ascon128a (~1465.5), Standalone_FrodoKEM_640_AES (~1195.0).
+- Timing stability varies: CV ranges roughly 8% to 26%, so some models are notably less consistent.
+- CPU utilization is stable near ~49-50% across models, suggesting utilization does not drive
+  timing differences.
+
+Entropy findings (native)
+- Entropy is consistently near ideal across all models: ~7.99998 bits/byte.
+- Serial correlation coefficients are near zero, indicating good randomness quality.
+
+gem5 comparison (standalone only)
+- Only 4 standalone models are available in gem5 data; no hybrid performance data is present.
+- gem5 vs native timing is inconsistent for these models:
+  - Ratios range from ~0.44 (gem5 faster) to ~11.9 (gem5 slower).
+  - Pearson correlation is moderate (~0.867), but Spearman is low (~0.400), indicating weak
+    rank agreement.
+- Interpretation: gem5 results do not reliably preserve native performance ordering for the
+  limited models available, so use gem5 comparisons cautiously.
+
+Notes and limitations
+- gem5 data does not include hybrids, so hybrid vs standalone conclusions are based solely on
+  native measurements.
+- This findings summary reflects analysis_output/latest/statistical_report.txt (current state).

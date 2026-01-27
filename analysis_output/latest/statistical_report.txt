@@ -1,0 +1,166 @@
+================================================================================
+STATISTICAL ANALYSIS REPORT: 2Core 1GB Configuration
+================================================================================
+
+CONFIGURATION
+----------------------------------------
+System: 2 CPU Cores, 1GB RAM
+Performance records: 110000
+Entropy records: 11000
+Models tested: 11
+
+gem5 performance records: 20
+gem5 models covered: 4
+gem5 standalone models: 4
+gem5 hybrid models: 0
+
+1. DESCRIPTIVE STATISTICS (Execution Time in nanoseconds)
+--------------------------------------------------------------------------------
+                                         count          mean          std      min         q25     median         q75      max       cv        iqr      ci_95
+Model                                                                                                                                                        
+Hybrid_BIKE_L1_Ascon128a                 10000  1.465478e+06  208431.4436  1066967  1323366.25  1403118.0  1541922.00  4283255  14.2228  218555.75  4085.2563
+Hybrid_ClassicMcEliece_348864_Ascon128a  10000  6.306430e+05  162627.0969   450065   539612.25   578305.5   629088.25  1333058  25.7875   89476.00  3187.4911
+Hybrid_FrodoKEM_640_AES_Ascon128a        10000  1.683652e+06  136782.1827  1368356  1602297.00  1655363.5  1733477.00  3010034   8.1241  131180.00  2680.9308
+Hybrid_Kyber512_Ascon128a                10000  4.938302e+05   50500.8883   417383   466402.50   482018.5   508107.00   956943  10.2264   41704.50   989.8174
+Hybrid_X25519_Ascon128a                  10000  6.096929e+05  134814.4380   451990   536793.25   561193.0   603919.75  1260407  22.1119   67126.50  2642.3630
+Standalone_Ascon_80pq                    10000  5.938416e+05   79502.7833   474636   544252.50   572302.5   626043.75  1070881  13.3879   81791.25  1558.2546
+Standalone_BIKE_L1                       10000  9.424858e+05  123408.8652   772590   861249.00   886124.0  1019326.50  1775972  13.0940  158077.50  2418.8138
+Standalone_ClassicMcEliece_348864        10000  8.499132e+04   17131.2231    61328    68276.00    82079.0   100483.00   151333  20.1564   32207.00   335.7720
+Standalone_FrodoKEM_640_AES              10000  1.195005e+06  103888.0443   951346  1136170.75  1170682.0  1234170.25  2395187   8.6935   97999.50  2036.2057
+Standalone_Kyber512                      10000  2.681521e+04    4521.1762    17955    23319.50    26115.0    29886.25    49918  16.8605    6566.75    88.6151
+Standalone_X25519                        10000  1.023019e+05   16217.9462    63677    89635.75   103540.5   114357.50   233557  15.8530   24721.75   317.8717
+
+2. PERFORMANCE SUMMARY (μs)
+--------------------------------------------------------------------------------
+                                         Mean (μs)  Std (μs)  Median (μs)  CV (%)
+Model                                                                            
+Standalone_Kyber512                          26.82      4.52        26.12   16.86
+Standalone_ClassicMcEliece_348864            84.99     17.13        82.08   20.16
+Standalone_X25519                           102.30     16.22       103.54   15.85
+Hybrid_Kyber512_Ascon128a                   493.83     50.50       482.02   10.23
+Standalone_Ascon_80pq                       593.84     79.50       572.30   13.39
+Hybrid_X25519_Ascon128a                     609.69    134.81       561.19   22.11
+Hybrid_ClassicMcEliece_348864_Ascon128a     630.64    162.63       578.31   25.79
+Standalone_BIKE_L1                          942.49    123.41       886.12   13.09
+Standalone_FrodoKEM_640_AES                1195.00    103.89      1170.68    8.69
+Hybrid_BIKE_L1_Ascon128a                   1465.48    208.43      1403.12   14.22
+Hybrid_FrodoKEM_640_AES_Ascon128a          1683.65    136.78      1655.36    8.12
+
+3. CPU CYCLE STATISTICS
+--------------------------------------------------------------------------------
+                                         Mean Cycles       Std      Min      Max
+Model                                                                           
+Hybrid_BIKE_L1_Ascon128a                   4552858.0  587516.0  4057390  7893266
+Hybrid_ClassicMcEliece_348864_Ascon128a    1877502.0  392629.0  1579411  3511641
+Hybrid_FrodoKEM_640_AES_Ascon128a          5341057.0  347615.0  5059606  8545688
+Hybrid_Kyber512_Ascon128a                  1571291.0  141769.0  1447851  2791318
+Hybrid_X25519_Ascon128a                    1846440.0  363656.0  1622240  3160264
+Standalone_Ascon_80pq                      2072663.0  236379.0  1840938  3395571
+Standalone_BIKE_L1                         3024658.0  387276.0  2679442  5317088
+Standalone_ClassicMcEliece_348864           256284.0   47189.0   198774   422196
+Standalone_FrodoKEM_640_AES                3867432.0  267388.0  3677689  6125560
+Standalone_Kyber512                          89481.0   15058.0    68028   153333
+Standalone_X25519                           315631.0   45033.0   247713   501136
+
+4. CPU UTILIZATION STATISTICS (%)
+--------------------------------------------------------------------------------
+                                         Mean %   Std  Min %  Max %
+Model                                                              
+Hybrid_BIKE_L1_Ascon128a                  49.73  0.29  42.68  49.88
+Hybrid_ClassicMcEliece_348864_Ascon128a   49.12  1.47  33.02  49.91
+Hybrid_FrodoKEM_640_AES_Ascon128a         49.60  0.56  42.60  49.91
+Hybrid_Kyber512_Ascon128a                 49.61  0.50  28.82  49.91
+Hybrid_X25519_Ascon128a                   49.52  1.06  34.78  49.92
+Standalone_Ascon_80pq                     49.69  0.27  41.23  49.93
+Standalone_BIKE_L1                        49.76  0.10  46.57  49.95
+Standalone_ClassicMcEliece_348864         49.15  0.61  37.27  49.59
+Standalone_FrodoKEM_640_AES               49.68  0.62  33.97  49.95
+Standalone_Kyber512                       48.16  0.78  28.09  49.06
+Standalone_X25519                         49.28  0.68  19.48  49.66
+
+5. KRUSKAL-WALLIS H-TEST (Non-parametric ANOVA)
+--------------------------------------------------------------------------------
+H-statistic: 104729.3343
+p-value: 0.00e+00
+Significant difference: Yes
+
+
+6. PAIRWISE MANN-WHITNEY U TESTS (Bonferroni corrected)
+--------------------------------------------------------------------------------
+Significant pairwise differences: 54/55
+
+Top 10 most significant comparisons:
+               model1                            model2   statistic  p_value  corrected_p  significant
+Standalone_Ascon_80pq                Standalone_BIKE_L1   1369511.0      0.0          0.0         True
+Standalone_Ascon_80pq               Standalone_Kyber512 100000000.0      0.0          0.0         True
+Standalone_Ascon_80pq       Standalone_FrodoKEM_640_AES      2949.0      0.0          0.0         True
+Standalone_Ascon_80pq Standalone_ClassicMcEliece_348864 100000000.0      0.0          0.0         True
+Standalone_Ascon_80pq                 Standalone_X25519 100000000.0      0.0          0.0         True
+Standalone_Ascon_80pq          Hybrid_BIKE_L1_Ascon128a         4.0      0.0          0.0         True
+Standalone_Ascon_80pq         Hybrid_Kyber512_Ascon128a  93144265.5      0.0          0.0         True
+Standalone_Ascon_80pq Hybrid_FrodoKEM_640_AES_Ascon128a         0.0      0.0          0.0         True
+   Standalone_BIKE_L1               Standalone_Kyber512 100000000.0      0.0          0.0         True
+   Standalone_BIKE_L1       Standalone_FrodoKEM_640_AES   2857747.0      0.0          0.0         True
+
+7. ENTROPY STATISTICS
+--------------------------------------------------------------------------------
+                                        Entropy_Bits_Per_Byte                               Serial_Correlation_Coefficient                              
+                                                         mean       std       min       max                           mean       std       min       max
+Model                                                                                                                                                   
+Hybrid_BIKE_L1_Ascon128a                             7.999982  0.000002  7.999977  7.999987                       0.000003  0.000303 -0.001024  0.001215
+Hybrid_ClassicMcEliece_348864_Ascon128a              7.999983  0.000002  7.999977  7.999987                       0.000012  0.000315 -0.001005  0.001245
+Hybrid_FrodoKEM_640_AES_Ascon128a                    7.999982  0.000002  7.999977  7.999987                       0.000005  0.000313 -0.001033  0.000902
+Hybrid_Kyber512_Ascon128a                            7.999982  0.000001  7.999978  7.999987                       0.000008  0.000295 -0.000955  0.001041
+Hybrid_X25519_Ascon128a                              7.999982  0.000002  7.999978  7.999987                      -0.000017  0.000314 -0.000989  0.000797
+Standalone_Ascon_80pq                                7.999982  0.000002  7.999977  7.999987                      -0.000001  0.000317 -0.001005  0.001057
+Standalone_BIKE_L1                                   7.999982  0.000002  7.999977  7.999987                       0.000005  0.000310 -0.001084  0.000987
+Standalone_ClassicMcEliece_348864                    7.999982  0.000002  7.999977  7.999987                      -0.000011  0.000306 -0.001025  0.000916
+Standalone_FrodoKEM_640_AES                          7.999982  0.000001  7.999978  7.999989                       0.000003  0.000303 -0.000848  0.000972
+Standalone_Kyber512                                  7.999982  0.000002  7.999976  7.999987                      -0.000001  0.000319 -0.001095  0.000893
+Standalone_X25519                                    7.999982  0.000002  7.999977  7.999987                      -0.000007  0.000315 -0.001001  0.000892
+
+Note: Ideal entropy = 8.0 bits/byte, Ideal serial correlation = 0.0
+
+
+8. MODEL RANKINGS
+--------------------------------------------------------------------------------
+
+By Execution Time (fastest to slowest):
+  1. Standalone_Kyber512: 26.82 μs
+  2. Standalone_ClassicMcEliece_348864: 84.99 μs
+  3. Standalone_X25519: 102.30 μs
+  4. Hybrid_Kyber512_Ascon128a: 493.83 μs
+  5. Standalone_Ascon_80pq: 593.84 μs
+  6. Hybrid_X25519_Ascon128a: 609.69 μs
+  7. Hybrid_ClassicMcEliece_348864_Ascon128a: 630.64 μs
+  8. Standalone_BIKE_L1: 942.49 μs
+  9. Standalone_FrodoKEM_640_AES: 1195.00 μs
+  10. Hybrid_BIKE_L1_Ascon128a: 1465.48 μs
+  11. Hybrid_FrodoKEM_640_AES_Ascon128a: 1683.65 μs
+
+9. STANDALONE vs HYBRID COMPARISON
+--------------------------------------------------------------------------------
+Standalone PQC - Mean: 490.91 μs, Median: 354.10 μs
+Hybrid PQC+AEAD - Mean: 976.66 μs, Median: 621.29 μs
+Mann-Whitney U test: p = 0.00e+00
+
+10. GEM5 COMPARISON (Native vs gem5)
+--------------------------------------------------------------------------------
+gem5 performance records: 20
+Models compared: 4
+Correlation (Pearson): 0.867
+Correlation (Spearman): 0.400
+
+Mean Execution Time Comparison (us):
+                             Native Mean (us)  gem5 Mean (us)  gem5/native  Pct Diff (%)
+Model                                                                                   
+Standalone_Ascon_80pq                 593.842         258.915        0.436       -56.400
+Standalone_FrodoKEM_640_AES          1195.005       11914.964        9.971       897.064
+Standalone_X25519                     102.302        1188.667       11.619      1061.920
+Standalone_Kyber512                    26.815         319.447       11.913      1091.291
+
+Note: gem5/native < 1 means gem5 is faster than native measurement.
+
+================================================================================
+END OF REPORT
+================================================================================
