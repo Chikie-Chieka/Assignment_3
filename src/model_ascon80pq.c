@@ -19,6 +19,7 @@ static double cpu_pct_process_window(const struct timespec *w0, const struct tim
 
 void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
+    int cycles_fd = perf_cycles_open();
 
     double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
@@ -27,12 +28,11 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
         r.Iteration = (i - cfg->warmup) + 1;
 
         r.Failed = 0;
-        long rss_peak_kb = current_rss_kb();
-        if (rss_peak_kb < 0) rss_peak_kb = 0;
-
         struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
         clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
 
         // No KEM overhead
         r.KeyGen_ns = 0;
@@ -62,8 +62,6 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
             r.Failed = 1;
         }
         uint64_t te1 = now_ns_monotonic_raw();
-        long rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         uint64_t td0 = now_ns_monotonic_raw();
         size_t mlen = 0;
@@ -73,8 +71,6 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
             r.Failed = 1;
         }
         uint64_t td1 = now_ns_monotonic_raw();
-        rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encryption_ns = te1 - te0;
         r.Decryption_ns = td1 - td0;
@@ -85,16 +81,17 @@ void run_ascon80pq_tagonly(const bench_config_t *cfg, csv_writer_t *csv) {
 
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
 
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
-        r.Peak_Alloc_KB = peak_rss_kb();
-        r.Peak_RSS_KB = rss_peak_kb;
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
 
         free(ct); free(pt);
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
+    perf_cycles_close(cycles_fd);
 }

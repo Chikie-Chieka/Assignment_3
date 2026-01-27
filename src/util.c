@@ -7,32 +7,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
 
 uint64_t now_ns_monotonic_raw(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
-}
-
-long peak_rss_kb(void) {
-    struct rusage u;
-    if (getrusage(RUSAGE_SELF, &u) != 0) return -1;
-    return u.ru_maxrss; // Linux: KB
-}
-
-long current_rss_kb(void) {
-    FILE *fp = fopen("/proc/self/status", "r");
-    if (!fp) return -1;
-    char line[256];
-    long value = -1;
-    while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "VmRSS:", 6) == 0) {
-            sscanf(line + 6, "%ld", &value);
-            break;
-        }
-    }
-    fclose(fp);
-    return value;
 }
 
 static long parse_cpuset_count(const char *s) {
@@ -112,6 +93,30 @@ double effective_ncpu(void) {
     }
     if (effective <= 0.0) effective = fallback;
     return effective;
+}
+
+int perf_cycles_open(void) {
+    struct perf_event_attr pe;
+    memset(&pe, 0, sizeof(pe));
+    pe.type = PERF_TYPE_HARDWARE;
+    pe.size = sizeof(pe);
+    pe.config = PERF_COUNT_HW_CPU_CYCLES;
+    pe.disabled = 0;
+    pe.exclude_kernel = 1;
+    pe.exclude_hv = 1;
+    int fd = (int)syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
+    if (fd < 0) return -1;
+    return fd;
+}
+
+uint64_t perf_cycles_read(int fd) {
+    uint64_t val = 0;
+    if (fd >= 0) read(fd, &val, sizeof(val));
+    return val;
+}
+
+void perf_cycles_close(int fd) {
+    if (fd >= 0) close(fd);
 }
 
 void psk20_from_seed_sha256(const char *seed, uint8_t out20[20]) {

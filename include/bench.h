@@ -40,7 +40,6 @@ typedef struct {
     uint64_t Total_ns;
     double Total_s;
     double Cpu_Pct;          // 100 * cpu_time / (wall_time * Ncpu)
+    uint64_t Cycle_Count;    // hardware cycles per iteration (if available)
     int Failed;
-    long Peak_Alloc_KB;      // Linux ru_maxrss in KB
-    long Peak_RSS_KB;        // VmRSS peak during iteration window
 } csv_row_t;
