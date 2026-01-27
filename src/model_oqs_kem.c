@@ -253,9 +253,6 @@ void run_standalone_kyber512(const bench_config_t *cfg, csv_writer_t *csv) {
 void run_standalone_frodokem_640_aes(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_only("Standalone_FrodoKEM_640_AES", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
 }
-void run_standalone_hqc_128(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_only("Standalone_HQC_128", OQS_KEM_alg_hqc_128, cfg, csv);
-}
 void run_standalone_classic_mceliece_348864(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_only("Standalone_ClassicMcEliece_348864", OQS_KEM_alg_classic_mceliece_348864, cfg, csv);
 }
@@ -264,7 +261,4 @@ void run_hybrid_classic_mceliece_348864_ascon128a(const bench_config_t *cfg, csv
 }
 void run_hybrid_frodokem_640_aes_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_dem("Hybrid_FrodoKEM_640_AES_Ascon128a", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
-}
-void run_hybrid_hqc_128_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_dem("Hybrid_HQC_128_Ascon128a", OQS_KEM_alg_hqc_128, cfg, csv);
 }

@@ -94,13 +94,11 @@ optional arguments:
                         2=Standalone_BIKE_L1
                         3=Standalone_Kyber512
                         4=Standalone_FrodoKEM_640_AES
-                        5=Standalone_HQC_128
-                        6=Standalone_ClassicMcEliece_348864
-                        7=Standalone_X25519
-                        8=Hybrid_BIKE_L1_Ascon128a
-                        9=Hybrid_Kyber512_Ascon128a
-                        10=Hybrid_FrodoKEM_640_AES_Ascon128a
-                        11=Hybrid_HQC_128_Ascon128a
-                        12=Hybrid_ClassicMcEliece_348864_Ascon128a
-                        13=Hybrid_X25519_Ascon128a
+                        5=Standalone_ClassicMcEliece_348864
+                        6=Standalone_X25519
+                        7=Hybrid_BIKE_L1_Ascon128a
+                        8=Hybrid_Kyber512_Ascon128a
+                        9=Hybrid_FrodoKEM_640_AES_Ascon128a
+                        10=Hybrid_ClassicMcEliece_348864_Ascon128a
+                        11=Hybrid_X25519_Ascon128a
 ```
