@@ -75,6 +75,7 @@ out:
 
 void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
+    int cycles_fd = perf_cycles_open();
 
     size_t ccap = cfg->payload_len + 16;
     uint8_t *c = malloc(ccap);
@@ -96,12 +97,11 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;
-        long rss_peak_kb = current_rss_kb();
-        if (rss_peak_kb < 0) rss_peak_kb = 0;
-
         struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
         clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
 
         uint64_t t1 = now_ns_monotonic_raw();
 
@@ -110,12 +110,8 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
 
         if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
-        long rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
-        rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -127,8 +123,6 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
             if (kdf_hkdf_sha256(ss_srv, ss_srv_len, k16, &r.KDF_ns) != 0) {
                 r.Failed = 1;
             }
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint8_t nonce16[16];
             for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
@@ -141,8 +135,6 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
                 r.Failed = 1;
             }
             uint64_t te1 = now_ns_monotonic_raw();
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint64_t td0 = now_ns_monotonic_raw();
             size_t mlen = 0;
@@ -152,8 +144,6 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
                 r.Failed = 1;
             }
             uint64_t td1 = now_ns_monotonic_raw();
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             r.Encryption_ns = te1 - te0;
             r.Decryption_ns = td1 - td0;
@@ -164,17 +154,18 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
 
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
 
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
-        r.Peak_Alloc_KB = peak_rss_kb();
-        r.Peak_RSS_KB = rss_peak_kb;
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
+    perf_cycles_close(cycles_fd);
     EVP_PKEY_free(srv);
     EVP_PKEY_free(cli);
     free(c);
@@ -183,6 +174,7 @@ void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
 
 void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
+    int cycles_fd = perf_cycles_open();
 
     // 1. Measure KeyGen once, outside the loop
     uint64_t t_kg0 = now_ns_monotonic_raw();
@@ -199,12 +191,11 @@ void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;
-        long rss_peak_kb = current_rss_kb();
-        if (rss_peak_kb < 0) rss_peak_kb = 0;
-
         struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
         clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
 
         uint64_t t1 = now_ns_monotonic_raw();
 
@@ -213,12 +204,8 @@ void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
 
         if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
-        long rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
-        rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -227,16 +214,17 @@ void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
 
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
 
         r.Total_ns = r.Encaps_ns + r.Decaps_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
-        r.Peak_Alloc_KB = peak_rss_kb();
-        r.Peak_RSS_KB = rss_peak_kb;
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
+    perf_cycles_close(cycles_fd);
     EVP_PKEY_free(srv);
     EVP_PKEY_free(cli);
 }

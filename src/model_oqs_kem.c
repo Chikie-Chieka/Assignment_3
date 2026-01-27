@@ -51,6 +51,7 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     OQS_KEM *kem = OQS_KEM_new(kem_alg);
     if (!kem) return;
 
+    int cycles_fd = -1;
     uint8_t *pk = malloc(kem->length_public_key);
     uint8_t *sk = malloc(kem->length_secret_key);
     uint8_t *ct = malloc(kem->length_ciphertext);
@@ -61,6 +62,7 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
     if (!pk || !sk || !ct || !ss_e || !ss_d) goto out;
 
     int total = cfg->warmup + cfg->iterations;
+    cycles_fd = perf_cycles_open();
 
     // ciphertext buffer for DEM: payload + 16B tag (typical AEAD)
     size_t ccap = cfg->payload_len + 16;
@@ -81,22 +83,17 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
         r.KeyGen_ns = keygen_ns;
-        long rss_peak_kb = current_rss_kb();
-        if (rss_peak_kb < 0) rss_peak_kb = 0;
-
         struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
         clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
 
         uint64_t t1 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
-        long rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
-        rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -108,8 +105,6 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
             if (kdf_hkdf_sha256(ss_d, kem->length_shared_secret, k16, &r.KDF_ns) != 0) {
                 r.Failed = 1;
             }
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint8_t nonce16[16];
             for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
@@ -122,8 +117,6 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
             }
             uint64_t te1 = now_ns_monotonic_raw();
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             uint64_t td0 = now_ns_monotonic_raw();
             size_t mlen = 0;
@@ -133,8 +126,6 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
                 r.Failed = 1;
             }
             uint64_t td1 = now_ns_monotonic_raw();
-            rss_kb = current_rss_kb();
-            if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
             r.Encryption_ns = te1 - te0;
             r.Decryption_ns = td1 - td0;
@@ -145,18 +136,19 @@ static void run_oqs_kem_dem(const char *model_name, const char *kem_alg,
 
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
 
         // 2. Calculate Total_ns as a sum (matches Python)
         r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
-        r.Peak_Alloc_KB = peak_rss_kb();
-        r.Peak_RSS_KB = rss_peak_kb;
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
 out:
+    if (cycles_fd >= 0) perf_cycles_close(cycles_fd);
     if (c) free(c);
     if (m) free(m);
     if (pk) free(pk);
@@ -173,6 +165,7 @@ static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
     OQS_KEM *kem = OQS_KEM_new(kem_alg);
     if (!kem) return;
 
+    int cycles_fd = -1;
     uint8_t *pk = malloc(kem->length_public_key);
     uint8_t *sk = malloc(kem->length_secret_key);
     uint8_t *ct = malloc(kem->length_ciphertext);
@@ -181,6 +174,7 @@ static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
     if (!pk || !sk || !ct || !ss_e || !ss_d) goto out;
 
     int total = cfg->warmup + cfg->iterations;
+    cycles_fd = perf_cycles_open();
 
     // 1. Measure KeyGen once, outside the loop (matches Python)
     uint64_t t_kg0 = now_ns_monotonic_raw();
@@ -195,22 +189,17 @@ static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = (kg_rc != OQS_SUCCESS) ? 1 : 0;
         r.KeyGen_ns = keygen_ns;
-        long rss_peak_kb = current_rss_kb();
-        if (rss_peak_kb < 0) rss_peak_kb = 0;
-
         struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
         clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
 
         uint64_t t1 = now_ns_monotonic_raw();
         if (!r.Failed && OQS_KEM_encaps(kem, ct, ss_e, pk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t2 = now_ns_monotonic_raw();
-        long rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
         if (!r.Failed && OQS_KEM_decaps(kem, ss_d, ct, sk) != OQS_SUCCESS) r.Failed = 1;
         uint64_t t3 = now_ns_monotonic_raw();
-        rss_kb = current_rss_kb();
-        if (rss_kb > rss_peak_kb) rss_peak_kb = rss_kb;
 
         r.Encaps_ns = t2 - t1;
         r.Decaps_ns = t3 - t2;
@@ -219,17 +208,18 @@ static void run_oqs_kem_only(const char *model_name, const char *kem_alg,
 
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
 
         r.Total_ns = r.Encaps_ns + r.Decaps_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
-        r.Peak_Alloc_KB = peak_rss_kb();
-        r.Peak_RSS_KB = rss_peak_kb;
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
 
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
 out:
+    if (cycles_fd >= 0) perf_cycles_close(cycles_fd);
     if (pk) free(pk);
     if (sk) free(sk);
     if (ct) free(ct);
@@ -253,9 +243,6 @@ void run_standalone_kyber512(const bench_config_t *cfg, csv_writer_t *csv) {
 void run_standalone_frodokem_640_aes(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_only("Standalone_FrodoKEM_640_AES", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
 }
-void run_standalone_hqc_128(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_only("Standalone_HQC_128", OQS_KEM_alg_hqc_128, cfg, csv);
-}
 void run_standalone_classic_mceliece_348864(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_only("Standalone_ClassicMcEliece_348864", OQS_KEM_alg_classic_mceliece_348864, cfg, csv);
 }
@@ -264,7 +251,4 @@ void run_hybrid_classic_mceliece_348864_ascon128a(const bench_config_t *cfg, csv
 }
 void run_hybrid_frodokem_640_aes_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     run_oqs_kem_dem("Hybrid_FrodoKEM_640_AES_Ascon128a", OQS_KEM_alg_frodokem_640_aes, cfg, csv);
-}
-void run_hybrid_hqc_128_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_oqs_kem_dem("Hybrid_HQC_128_Ascon128a", OQS_KEM_alg_hqc_128, cfg, csv);
 }
