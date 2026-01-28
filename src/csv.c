@@ -5,6 +5,7 @@ int csv_open(csv_writer_t *w, const char *path) {
     memset(w, 0, sizeof(*w));
     w->fp = fopen(path, "w");
     if (!w->fp) return -1;
+    setvbuf(w->fp, NULL, _IOFBF, 0);
     pthread_mutex_init(&w->mu, NULL);
     return 0;
 }
@@ -15,7 +16,6 @@ void csv_write_header(csv_writer_t *w) {
     fprintf(w->fp,
         "Model,Iteration,KeyGen_ns,Encaps_ns,Decaps_ns,KDF_ns,"
         "Encryption_ns,Decryption_ns,Total_ns,Total_s,Cpu_Pct,Cycle_Count,Failed\n");
-    fflush(w->fp);
     pthread_mutex_unlock(&w->mu);
 }
 
@@ -37,7 +37,6 @@ void csv_write_row(csv_writer_t *w, const csv_row_t *r) {
         (unsigned long long)r->Cycle_Count,
         r->Failed
     );
-    fflush(w->fp);
     pthread_mutex_unlock(&w->mu);
 }
 

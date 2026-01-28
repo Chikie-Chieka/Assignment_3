@@ -20,6 +20,7 @@ static int ent_open(ent_writer_t *w, const char *path) {
     memset(w, 0, sizeof(*w));
     w->fp = fopen(path, "w");
     if (!w->fp) return -1;
+    setvbuf(w->fp, NULL, _IOFBF, 0);
     pthread_mutex_init(&w->mu, NULL);
     return 0;
 }
@@ -31,7 +32,6 @@ static void ent_write_header(ent_writer_t *w) {
     if (!w || !w->fp) return;
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp, "Model,Iteration,Entropy_Bytes,Entropy_Bits_Per_Byte,Serial_Correlation_Coefficient,Status\n");
-    fflush(w->fp);
     pthread_mutex_unlock(&w->mu);
 }
 static void ent_write_row(ent_writer_t *w,
@@ -42,7 +42,6 @@ static void ent_write_row(ent_writer_t *w,
     pthread_mutex_lock(&w->mu);
     fprintf(w->fp, "%s,%d,%zu,%.12f,%.12f,%s\n",
             model, iter, entropy_bytes, h_bits_per_byte, scc, status);
-    fflush(w->fp);
     pthread_mutex_unlock(&w->mu);
 }
 
