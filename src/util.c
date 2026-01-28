@@ -96,6 +96,7 @@ double effective_ncpu(void) {
 }
 
 int perf_cycles_open(void) {
+	/*
     struct perf_event_attr pe;
     memset(&pe, 0, sizeof(pe));
     pe.type = PERF_TYPE_HARDWARE;
@@ -107,6 +108,8 @@ int perf_cycles_open(void) {
     int fd = (int)syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
     if (fd < 0) return -1;
     return fd;
+*/
+    return -1;
 }
 
 uint64_t perf_cycles_read(int fd) {

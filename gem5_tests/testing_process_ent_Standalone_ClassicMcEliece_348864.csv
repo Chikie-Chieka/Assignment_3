@@ -1,3 +1,0 @@
-Model,Iteration,Entropy_Bytes,Entropy_Bits_Per_Byte,Serial_Correlation_Coefficient,Status
-Standalone_ClassicMcEliece_348864,1,1048576,7.999816587986,0.000200995347,success
-Standalone_ClassicMcEliece_348864,2,1048576,7.999798658944,-0.000746436070,success
