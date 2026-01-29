@@ -46,9 +46,9 @@ static void bench_print_help(const char *prog) {
     printf("optional arguments:\n");
     printf("  -h, --help            show this help message and exit\n");
     printf("  --iterations ITERATIONS\n");
-    printf("                        (default: 100)\n");
+    printf("                        (default: 10)\n");
     printf("  --payload-bytes PAYLOAD_BYTES\n");
-    printf("                        (default: 4096)\n");
+    printf("                        (default: 65536)\n");
     printf("  --aad AAD             (default: )\n");
     printf("  --seed SEED           (default: 1337)\n");
     printf("  --ent-iterations ENT_ITERATIONS\n");
@@ -78,16 +78,16 @@ static void bench_print_help(const char *prog) {
 }
 
 void bench_parse_args(int argc, char **argv, bench_config_t *cfg) {
-    // Defaults matching experiment_final.py
-    cfg->iterations = 100;
-    cfg->warmup = 1;
-    cfg->payload_bytes = 4096;
+    // Defaults for a quick run without ENT phase
+    cfg->iterations = 10;
+    cfg->warmup = 0;
+    cfg->payload_bytes = 65536;
     cfg->aad = "";
     cfg->seed = 1337;
     cfg->ent_payload_mb = 1;
     cfg->ent_iterations = 50;
     cfg->skip_latency = false;
-    cfg->skip_ent = false;
+    cfg->skip_ent = true;
     cfg->no_csv = false;
     cfg->model_id = 0;
     cfg->single_thread_mode = SINGLE_THREAD_NONE;
@@ -215,7 +215,11 @@ int main(int argc, char **argv) {
 
     // 3. Phase 1: Latency Benchmarking
     if (!cfg.skip_latency) {
-        printf("Running %d valid iterations per model (+ %d warmup)...\n", cfg.iterations, cfg.warmup);
+        if (cfg.warmup > 0) {
+            printf("Running %d valid iterations per model (+ %d warmup)...\n", cfg.iterations, cfg.warmup);
+        } else {
+            printf("Running %d valid iterations per model...\n", cfg.iterations);
+        }
         printf("Payload: %d bytes\n", cfg.payload_bytes);
         char latency_csv_path[256] = "testing_process.csv";
         if (cfg.model_id != 0) {
