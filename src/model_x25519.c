@@ -73,14 +73,14 @@ out:
     return ret;
 }
 
-static void run_x25519_dem(const char *model_name, const bench_config_t *cfg, csv_writer_t *csv) {
+void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
     int total = cfg->warmup + cfg->iterations;
     int cycles_fd = perf_cycles_open();
 
     size_t ccap = cfg->payload_len + 16;
     uint8_t *c = malloc(ccap);
     uint8_t *m = malloc(cfg->payload_len);
-    if (!c || !m) goto out;
+    if (!c || !m) return;
 
     // 1. Measure KeyGen once, outside the loop
     uint64_t t_kg0 = now_ns_monotonic_raw();
@@ -93,7 +93,101 @@ static void run_x25519_dem(const char *model_name, const bench_config_t *cfg, cs
     double ncpu = effective_ncpu();
     for (int i = 0; i < total; i++) {
         csv_row_t r; memset(&r, 0, sizeof(r));
-        strncpy(r.Model, model_name, sizeof(r.Model)-1);
+        strncpy(r.Model, "Hybrid_X25519_Ascon128a", sizeof(r.Model)-1);
+        r.Iteration = (i - cfg->warmup) + 1;
+        r.Failed = !kg_ok;
+        r.KeyGen_ns = keygen_ns;
+        struct timespec w0, w1, c0, c1;
+        uint64_t cyc0 = 0, cyc1 = 0;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w0);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+        cyc0 = perf_cycles_read(cycles_fd);
+
+        uint64_t t1 = now_ns_monotonic_raw();
+
+        uint8_t ss_cli[64], ss_srv[64];
+        size_t ss_cli_len=0, ss_srv_len=0;
+
+        if (!r.Failed && !x25519_derive(cli, srv, ss_cli, sizeof(ss_cli), &ss_cli_len)) r.Failed = 1;
+        uint64_t t2 = now_ns_monotonic_raw();
+        if (!r.Failed && !x25519_derive(srv, cli, ss_srv, sizeof(ss_srv), &ss_srv_len)) r.Failed = 1;
+        uint64_t t3 = now_ns_monotonic_raw();
+
+        r.Encaps_ns = t2 - t1;
+        r.Decaps_ns = t3 - t2;
+
+        if (!r.Failed && (ss_cli_len != ss_srv_len || memcmp(ss_cli, ss_srv, ss_cli_len) != 0)) r.Failed = 1;
+
+        if (!r.Failed) {
+            uint8_t k16[16];
+            if (kdf_hkdf_sha256(ss_srv, ss_srv_len, k16, &r.KDF_ns) != 0) {
+                r.Failed = 1;
+            }
+
+            uint8_t nonce16[16];
+            for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
+            
+            uint64_t te0 = now_ns_monotonic_raw();
+            size_t clen = 0;
+            if (ascon128a_aead_encrypt(c, &clen, cfg->payload, cfg->payload_len,
+                                      (const uint8_t*)cfg->aad, strlen(cfg->aad),
+                                      nonce16, k16) != 0) {
+                r.Failed = 1;
+            }
+            uint64_t te1 = now_ns_monotonic_raw();
+
+            uint64_t td0 = now_ns_monotonic_raw();
+            size_t mlen = 0;
+            if (!r.Failed && ascon128a_aead_decrypt(m, &mlen, c, clen,
+                                                   (const uint8_t*)cfg->aad, strlen(cfg->aad),
+                                                   nonce16, k16) != 0) {
+                r.Failed = 1;
+            }
+            uint64_t td1 = now_ns_monotonic_raw();
+
+            r.Encryption_ns = te1 - te0;
+            r.Decryption_ns = td1 - td0;
+
+        if (!r.Failed && (mlen != cfg->payload_len || memcmp(m, cfg->payload, cfg->payload_len) != 0))
+            r.Failed = 1;
+        }
+
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
+        cyc1 = perf_cycles_read(cycles_fd);
+
+        // 2. Calculate Total_ns as a sum (matches Python)
+        r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
+        r.Total_s = (double)r.Total_ns / 1e9;
+        r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
+        r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
+
+        if (i >= cfg->warmup) csv_write_row(csv, &r);
+    }
+
+    perf_cycles_close(cycles_fd);
+    EVP_PKEY_free(srv);
+    EVP_PKEY_free(cli);
+    free(c);
+    free(m);
+}
+
+void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
+    int total = cfg->warmup + cfg->iterations;
+    int cycles_fd = perf_cycles_open();
+
+    // 1. Measure KeyGen once, outside the loop
+    uint64_t t_kg0 = now_ns_monotonic_raw();
+    EVP_PKEY *srv = NULL, *cli = NULL;
+    int kg_ok = 1;
+    if (!x25519_keypair(&srv) || !x25519_keypair(&cli)) kg_ok = 0;
+    uint64_t t_kg1 = now_ns_monotonic_raw();
+    uint64_t keygen_ns = t_kg1 - t_kg0;
+
+    double ncpu = effective_ncpu();
+    for (int i = 0; i < total; i++) {
+        csv_row_t r; memset(&r, 0, sizeof(r));
+        strncpy(r.Model, "Standalone_X25519", sizeof(r.Model)-1);
         r.Iteration = (i - cfg->warmup) + 1;
         r.Failed = !kg_ok;
         r.KeyGen_ns = keygen_ns;
@@ -118,45 +212,11 @@ static void run_x25519_dem(const char *model_name, const bench_config_t *cfg, cs
 
         if (!r.Failed && (ss_cli_len != ss_srv_len || memcmp(ss_cli, ss_srv, ss_cli_len) != 0)) r.Failed = 1;
 
-        if (!r.Failed) {
-            uint8_t k16[16];
-            if (kdf_hkdf_sha256(ss_srv, ss_srv_len, k16, &r.KDF_ns) != 0) {
-                r.Failed = 1;
-            }
-
-            uint8_t nonce16[16];
-            for(int k=0; k<16; ++k) nonce16[k] = rand() & 0xFF;
-
-            uint64_t te0 = now_ns_monotonic_raw();
-            size_t clen = 0;
-            if (ascon128a_aead_encrypt(c, &clen, cfg->payload, cfg->payload_len,
-                                      (const uint8_t*)cfg->aad, strlen(cfg->aad),
-                                      nonce16, k16) != 0) {
-                r.Failed = 1;
-            }
-            uint64_t te1 = now_ns_monotonic_raw();
-
-            uint64_t td0 = now_ns_monotonic_raw();
-            size_t mlen = 0;
-            if (!r.Failed && ascon128a_aead_decrypt(m, &mlen, c, clen,
-                                                   (const uint8_t*)cfg->aad, strlen(cfg->aad),
-                                                   nonce16, k16) != 0) {
-                r.Failed = 1;
-            }
-            uint64_t td1 = now_ns_monotonic_raw();
-
-            r.Encryption_ns = te1 - te0;
-            r.Decryption_ns = td1 - td0;
-
-            if (!r.Failed && (mlen != cfg->payload_len || memcmp(m, cfg->payload, cfg->payload_len) != 0))
-                r.Failed = 1;
-        }
-
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
         clock_gettime(CLOCK_MONOTONIC_RAW, &w1);
         cyc1 = perf_cycles_read(cycles_fd);
 
-        r.Total_ns = r.Encaps_ns + r.Decaps_ns + r.KDF_ns + r.Encryption_ns + r.Decryption_ns;
+        r.Total_ns = r.Encaps_ns + r.Decaps_ns;
         r.Total_s = (double)r.Total_ns / 1e9;
         r.Cpu_Pct = cpu_pct_process_window(&w0, &w1, &c0, &c1, ncpu);
         r.Cycle_Count = (cyc1 >= cyc0) ? (cyc1 - cyc0) : 0;
@@ -164,18 +224,7 @@ static void run_x25519_dem(const char *model_name, const bench_config_t *cfg, cs
         if (i >= cfg->warmup) csv_write_row(csv, &r);
     }
 
-out:
-    if (cycles_fd >= 0) perf_cycles_close(cycles_fd);
+    perf_cycles_close(cycles_fd);
     EVP_PKEY_free(srv);
     EVP_PKEY_free(cli);
-    free(c);
-    free(m);
-}
-
-void run_hybrid_x25519_ascon128a(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_x25519_dem("Hybrid_X25519_Ascon128a", cfg, csv);
-}
-
-void run_standalone_x25519(const bench_config_t *cfg, csv_writer_t *csv) {
-    run_x25519_dem("Standalone_X25519", cfg, csv);
 }
