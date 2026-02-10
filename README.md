@@ -1,68 +1,31 @@
-# Post-Quantum IoT Cryptography Benchmark
+# Post-Quantum Cryptography Benchmark — Artifact
 
-## 1. Introduction
+This repo is the artifact for **<PAPER TITLE>** (<VENUE>, <YEAR>) and reproduces **Fig. <...>** and **Table <...>**.
 
-The transition to Post-Quantum (PQ) computing necessitates a shift toward quantum-agile cryptographic designs. However, standard Post-Quantum Cryptography (PQC) algorithms often impose a significant "Security Tax"—excessive memory, latency, and energy overheads—rendering them impractical for resource-constrained IoT devices.
+## Repository layout
+- `src/`, `include/`: C benchmark sources
+- `bench_c_arm`: AArch64 binary for gem5 (SE mode)
+- `experiment_final.py`: full experiment driver
+- `analysis.py` + `requirements.txt`: plot/table regeneration
+- `saved_output/`: reference outputs (golden)
+- `analysis_output/`: generated plots/tables
+- `gem5_tests/`: gem5 helpers/configs
+- `oqs_arm/`: PQC dependency build for ARM
 
-This project addresses this critical gap by conducting a comparative analysis of hybrid cryptographic architectures against a standalone quantum-resistant baseline. By integrating lightweight Authenticated Encryption (Ascon-128a) with various Key Encapsulation Mechanisms (KEMs), we evaluate the trade-offs between architectural complexity, performance overhead, and statistical robustness. The goal is to identify viable, efficient migration paths for 8-bit and 32-bit microcontrollers in a post-quantum landscape.
+## Prerequisites (Arch Linux x86_64 baseline)
+Hardware baseline: laptop (x86_64), **2 cores pinned**, **1 GiB RAM cap** (via `systemd-run`) for “constrained” runs.  
+Packages (minimum): `base-devel cmake python python-venv git`  
+Optional (gem5 build): `scons protobuf boost capstone` (+ gem5’s documented deps)
 
----
-
-## 2. Cryptographic Models
-
-This study benchmarks four distinct cryptographic architectures using a "KEM + DEM" (Key Encapsulation Mechanism + Data Encapsulation Mechanism) framework to simulate secure IoT sessions.
-
-### Hybrid Architectures (KEM + Ascon-128a)
-
-These models combine high-speed asymmetric key exchange with the efficiency of the Ascon-128a sponge construction.
-
-* **Lattice-Based Hybrid (Model A):** **Kyber-512 + Ascon-128a**
-* Utilizes ML-KEM (FIPS 203), the primary NIST standard for post-quantum key establishment.
-
-
-* **Code-Based Hybrid:** **BIKE-L1 + Ascon-128a**
-* Leverages the hardness of syndrome decoding; included to ensure algorithmic diversity and test trade-offs regarding key sizes and bandwidth.
-
-
-* **Classical Hybrid (Baseline):** **X25519 + Ascon-128a**
-* Uses Elliptic Curve Diffie-Hellman (ECC) to quantify the specific latency and memory costs of migrating from current pre-quantum standards.
-
-
-
-### Standalone Baseline
-
-* **Symmetric Quantum-Hardened:** **Ascon-80pq**
-* A non-hybrid alternative mode of Ascon with an extended 160-bit key. It resists quantum key search attacks (Grover’s algorithm) without the overhead of asymmetric KEM operations, serving as a control variable for the "Security Tax" analysis.
-
-
-
----
-
-## 3. Evaluation Metrics
-
-To quantify performance and security robustness, all models were subjected to a dataset of 40,000 observations (10,000 per model) and assessed against the following metrics:
-
-### Performance Overhead
-
-* **Cryptographic Latency ():** The total computational time required to complete the encryption/decryption cycle.
-* **Peak Memory Usage ():** The maximum RAM footprint utilized during operation, critical for constrained edge devices.
-
-### Statistical Randomness
-
-* **Shannon Entropy:** Measured in bits/byte (target ), ensuring the ciphertext is indistinguishable from random noise.
-* **Serial Correlation Coefficient (SCC):** A measurement of the dependence between successive bytes in the ciphertext to detect potential patterns or biases in the hybrid encapsulation process.
-
----
-
-## 4. How to run
-
-```
-make clean && make
-./build_c
+## Build (native x86_64)
+```bash
+make clean && make        # produces ./bench_c
+./bench_c --help          # lists models + flags
 ```
 
+## bench_c parameters
 ```
-Applicable parameters/arguments:
+./bench_c -help
 usage: ./bench_c [-h] [--iterations ITERATIONS] [--payload-bytes PAYLOAD_BYTES]
           [--aad AAD] [--seed SEED]
           [--ent-payload-mb ENT_PAYLOAD_MB] [--skip-latency] [--skip-ent]
@@ -102,3 +65,42 @@ optional arguments:
                         10=Hybrid_ClassicMcEliece_348864_Ascon128a
                         11=Hybrid_X25519_Ascon128a
 ```
+
+## Run: 5-minute smoke test (native)
+Runs a single fast model end-to-end (including ENT) to verify the toolchain.
+```bash
+sudo systemd-run --scope -p MemoryMax=1G -p MemorySwapMax=0 -p CPUQuota=200% bash -lc 'cd "$PWD" && taskset -c 0,1 ./bench_c --model 8 --payload-bytes 4096 --iterations 200 --ent-payload-mb 1 --ent-iterations 50 --seed 67 --single-thread none'
+```
+
+## Run: full experiment (native, paper settings)
+```bash
+sudo systemd-run --scope -p MemoryMax=1G -p MemorySwapMax=0 -p CPUQuota=200% bash -lc 'cd "$PWD" && taskset -c 0,1 ./bench_c --payload-bytes 65536 --iterations 10000 --ent-payload-mb 10 --ent-iterations 1000 --seed 67 --single-thread none'
+```
+
+## gem5 setup (ARMv8-A, SE mode)
+Paper microarch config: `TimingSimpleCPU` @2GHz; L1D 64KB/2-way, L1I 32KB/2-way, L2 2MB/8-way; DRAM 4GB; **single-thread**; **1 warmup + 50 measured**.
+
+1) Build gem5 (host x86_64):
+```bash
+git clone https://github.com/gem5/gem5 && cd gem5
+scons build/ARM/gem5.opt -j"$(nproc)"
+```
+
+2) Run one model (example: model 8 = Hybrid_Kyber512_Ascon128a):
+```bash
+GEM5=</path/to/gem5>
+OUT=gem5_out/model8
+"$GEM5"/build/ARM/gem5.opt --outdir="$OUT" "$GEM5"/configs/example/se.py \
+  --cpu-type=TimingSimpleCPU --cpu-clock=2GHz --caches --l2cache \
+  --l1d_size=64kB --l1i_size=32kB --l2_size=2MB --l1d_assoc=2 --l1i_assoc=2 --l2_assoc=8 \
+  --mem-size=4GB --cmd="$PWD/bench_c_arm" \
+  --options="--model 8 --payload-bytes 65536 --iterations 51 --seed 67 --skip-ent --single-thread full"
+```
+
+Extract cycles from `"$OUT"/stats.txt` (e.g., `system.cpu.numCycles`). Discard warmup; report median of last 50.
+
+## Expected outputs
+Native run (default): `testing_process.csv`, `results.json`, `ENT_Test.csv` (see `./bench_c --help` for `--skip-*` and `--no-csv`).  
+
+gem5 run: `gem5_out/*/stats.txt`, `config.json`, `config.ini` (+ `simout`).
+
